@@ -103,21 +103,25 @@ class SafePayGateway extends BasePaymentGateway {
     if (!tracker) {
       throw new AppError('Safepay did not return a tracker token in response', 502, 'PAYMENT_GATEWAY_ERROR');
     }
-    // Construct the components checkout URL using SafePay's components base and expected query params
+    // Construct the components checkout URL using SafePay's components base and include multiple param variants for compatibility
     const componentBase = this._getComponentUrl();
     const queryParams = new URLSearchParams({
+      // canonical params SafePay components expects
       token: tracker,
+      tracker: tracker,
       orderId: orderId,
+      order_id: orderId,
       env: environment,
       source: 'custom',
       passthrough: 'true',
     });
 
-    // SafePay expects a `redirectUrl` parameter (camelCase) for return URL
+    // Provide both camelCase and snake_case redirect/cancel params for compatibility with different SafePay versions
     if (callbackUrl) {
       queryParams.set('redirectUrl', callbackUrl);
-      // also provide a cancel/failed return if SafePay uses the same field name
+      queryParams.set('redirect_url', callbackUrl);
       queryParams.set('cancelUrl', callbackUrl);
+      queryParams.set('cancel_url', callbackUrl);
     }
 
     const redirectUrl = `${componentBase}?${queryParams.toString()}`;

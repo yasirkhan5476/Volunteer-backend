@@ -3,7 +3,7 @@
 /**
  * Abstract Base Payment Gateway interface.
  *
- * All payment gateway adapters (SafePay, JazzCash, EasyPaisa)
+ * SafePay payment gateway adapter
  * must extend this class.
  */
 class BasePaymentGateway {

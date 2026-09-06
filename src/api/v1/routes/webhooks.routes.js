@@ -24,28 +24,4 @@ router.post('/safepay', async (req, res, next) => {
   }
 });
 
-/**
- * POST /webhooks/jazzcash
- */
-router.post('/jazzcash', async (req, res, next) => {
-  try {
-    const result = await processWebhookUseCase.execute('JAZZCASH', req.body, req.headers);
-    res.status(200).json({ success: true, data: result });
-  } catch (err) {
-    next(err);
-  }
-});
-
-/**
- * POST /webhooks/easypaisa
- */
-router.post('/easypaisa', async (req, res, next) => {
-  try {
-    const result = await processWebhookUseCase.execute('EASYPAISA', req.body, req.headers);
-    res.status(200).json({ success: true, data: result });
-  } catch (err) {
-    next(err);
-  }
-});
-
 module.exports = router;

@@ -9,7 +9,7 @@ const initiateDonationSchema = z.object({
       eventId: z.string().uuid(),
       amount: z.number().positive().min(100, 'Minimum donation is 100'),
       currency: z.enum(['PKR', 'ZAR']).default('PKR'),
-      gateway: z.enum(['SAFE_PAY', 'JAZZCASH', 'EASYPAISA']),
+      gateway: z.literal('SAFE_PAY'),
       callbackUrl: z.string().url().optional(),
       customerMobile: z.string().optional(),
       customerEmail: z.string().email().optional(),

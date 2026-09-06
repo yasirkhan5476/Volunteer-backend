@@ -12,7 +12,7 @@ A production-ready **Node.js / Express** backend following Clean Architecture pr
 - **Email**: Nodemailer (SMTP)
 - **PDF**: PDFKit
 - **Storage**: Local filesystem (uploads/ directory)
-- **Payments**: SafePay, JazzCash, EasyPaisa
+- **Payments**: SafePay
 
 ## Quick Start
 
@@ -64,8 +64,6 @@ npm run dev
 | POST | `/api/v1/donations` | JWT | Initiate donation |
 | GET | `/api/v1/donations/my` | JWT | My donations |
 | POST | `/api/v1/webhooks/safepay` | — | SafePay callback |
-| POST | `/api/v1/webhooks/jazzcash` | — | JazzCash callback |
-| POST | `/api/v1/webhooks/easypaisa` | — | EasyPaisa callback |
 | POST | `/api/v1/passport/issue` | VOLUNTEER/ADMIN | Issue passport |
 | GET | `/api/v1/passport/verify/:id` | — | Verify passport |
 | GET | `/api/v1/passport/my` | JWT | My passports |

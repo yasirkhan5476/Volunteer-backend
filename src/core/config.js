@@ -81,17 +81,6 @@ const config = {
       webhookSecret: optional('SAFE_PAY_WEBHOOK_SECRET') || optional('SAFEPAY_WEBHOOK_SECRET') || optional('SAFE_PAY_SECRET') || optional('SAFEPAY_SECRET'),
       webhookUrl: optional('SAFE_PAY_WEBHOOK_URL') || optional('SAFEPAY_WEBHOOK_URL'),
     },
-    jazzcash: {
-      merchantId: optional('JAZZCASH_MERCHANT_ID'),
-      password: optional('JAZZCASH_PASSWORD'),
-      integritySalt: optional('JAZZCASH_INTEGRITY_SALT'),
-      baseUrl: optional('JAZZCASH_BASE_URL', 'https://sandbox.jazzcash.com.pk'),
-    },
-    easypaisa: {
-      storeId: optional('EASYPAISA_STORE_ID'),
-      hashKey: optional('EASYPAISA_HASH_KEY'),
-      baseUrl: optional('EASYPAISA_BASE_URL', 'https://easypay.easypaisa.com.pk'),
-    },
   },
 
   geofence: {

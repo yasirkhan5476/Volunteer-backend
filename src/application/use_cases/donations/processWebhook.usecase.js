@@ -14,7 +14,7 @@ class ProcessWebhookUseCase {
   }
 
   /**
-  * @param {string} gatewayName - 'SAFE_PAY' | 'JAZZCASH' | 'EASYPAISA'
+   * @param {string} gatewayName - 'SAFE_PAY'
    * @param {object} body - Raw webhook body
    * @param {object} headers - Webhook headers (for signature verification)
    * @returns {Promise<{ success: boolean, donationId: string, status: string }>}

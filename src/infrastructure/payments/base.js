@@ -1,7 +1,5 @@
 'use strict';
 
-const { JazzCashGateway } = require('./jazzcash');
-const { EasyPaisaGateway } = require('./easypaisa');
 const { SafePayGateway } = require('./safepay');
 const config = require('../../core/config');
 
@@ -17,7 +15,7 @@ class PaymentGatewayFactory {
   }
 
   /**
-  * @param {'SAFE_PAY'|'JAZZCASH'|'EASYPAISA'} name
+   * @param {'SAFE_PAY'} name
    * @returns {import('../../domain/interfaces/payment').BasePaymentGateway}
    */
   get(name) {
@@ -25,12 +23,6 @@ class PaymentGatewayFactory {
       switch (name) {
         case 'SAFE_PAY':
           this._instances[name] = new SafePayGateway(config.payments.safePay);
-          break;
-        case 'JAZZCASH':
-          this._instances[name] = new JazzCashGateway(config.payments.jazzcash);
-          break;
-        case 'EASYPAISA':
-          this._instances[name] = new EasyPaisaGateway(config.payments.easypaisa);
           break;
         default:
           throw new Error(`Unknown payment gateway: ${name}`);

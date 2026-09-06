@@ -55,6 +55,13 @@ app.use(express.urlencoded({ extended: true }));
 app.use(morgan(config.isDev ? 'dev' : 'combined'));
 
 // ─── Health Check ────────────────────────────────────────────
+app.get('/', (_req, res) => {
+  res.status(200).json({
+    message: 'Volunteer Backend API is running successfully!',
+    health: `${config.apiPrefix}/health`,
+  });
+});
+
 app.get(`${config.apiPrefix}/health`, (_req, res) => {
   res.status(200).json({
     success: true,

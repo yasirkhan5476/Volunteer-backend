@@ -7,65 +7,54 @@ const { AppError } = require('../../core/exceptions');
 /**
  * Safepay Payment Gateway Adapter
  * Official Documentation: https://getsafepay.com
- *
- * Flow:
- * 1. initiatePayment: POST /order/v1/init -> returns { data: { token: 'track_...' } }
- * 2. Redirect user to: {baseUrl}/components?token=track_...&orderId=...&redirectUrl=...
- * 3. parseWebhook: verifies X-SFPY-SIGNATURE and maps tracker status to internal status
- * 4. verifyPayment: inquires tracker status from reporter API
  */
 class SafePayGateway extends BasePaymentGateway {
   constructor(config) {
     super(config);
   }
 
-  /**
-   * Resolve Safepay public client key (e.g. sec_...)
-   */
   _getClientKey() {
     return this.config.publicKey || this.config.apiKey;
   }
 
-  /**
-   * Determine whether current environment is sandbox
-   */
-  _isSandbox() {
-    const base = (this.config.baseUrl || '').toLowerCase();
-    return base.includes('sandbox') || base.includes('dev') || process.env.NODE_ENV !== 'production';
+  _getMerchantSecret() {
+    return this.config.merchantSecret || this.config.secret || this.config.apiKey;
   }
 
-  /**
-   * Get clean base URL
-   */
+  _isSandbox() {
+    const base = (this.config.baseUrl || '').toLowerCase();
+    return (
+      base.includes('sandbox') ||
+      base.includes('dev') ||
+      process.env.NODE_ENV !== 'production'
+    );
+  }
+
   _getBaseUrl() {
-    const raw = (this.config.baseUrl || 'https://sandbox.api.getsafepay.com').replace(/\/$/, '');
-    // If dev.api.getsafepay.com was configured, default to sandbox.api.getsafepay.com which is the active sandbox
+    const raw = (
+      this.config.baseUrl || 'https://sandbox.api.getsafepay.com'
+    ).replace(/\/$/, '');
     if (raw.includes('dev.api.getsafepay.com')) {
       return 'https://sandbox.api.getsafepay.com';
     }
     return raw;
   }
 
-  /**
-   * Get component checkout base URL
-   */
   _getComponentUrl() {
     if (this._isSandbox()) {
-      return 'https://sandbox.api.getsafepay.com/components';
+      return 'https://sandbox.api.getsafepay.com/checkout/pay';
     }
-    return 'https://getsafepay.com/components';
+    return 'https://getsafepay.com/checkout/pay';
   }
 
-  /**
-   * Initiate a payment tracker and build the checkout redirect URL
-   *
-   * @param {{ amount: number, currency?: string, orderId: string, description?: string, callbackUrl?: string, webhookUrl?: string }} params
-   * @returns {Promise<{ gatewayRef: string, redirectUrl: string, meta: object }>}
-   */
- /**
-   * Initiate a payment tracker and build the checkout redirect URL
-   */
-  async initiatePayment({ amount, currency = 'PKR', orderId, description, callbackUrl, webhookUrl }) {
+  async initiatePayment({
+    amount,
+    currency = 'PKR',
+    orderId,
+    description,
+    callbackUrl,
+    webhookUrl,
+  }) {
     const clientKey = this._getClientKey();
     if (!clientKey) {
       throw new AppError(
@@ -76,9 +65,13 @@ class SafePayGateway extends BasePaymentGateway {
     }
 
     const baseUrl = this._getBaseUrl();
-    const checkoutPath = (this.config.checkoutPath || '/order/v1/init').replace(/^\//, '');
+    const checkoutPath = (this.config.checkoutPath || '/order/v1/init').replace(
+      /^\//,
+      ''
+    );
     const endpoint = `${baseUrl}/${checkoutPath}`;
     const environment = this._isSandbox() ? 'sandbox' : 'production';
+    const merchantSecret = this._getMerchantSecret();
 
     const payload = {
       client: clientKey,
@@ -93,6 +86,7 @@ class SafePayGateway extends BasePaymentGateway {
         'Content-Type': 'application/json',
         Accept: 'application/json',
         ...(this.config.apiKey && { 'X-SFPY-API-KEY': this.config.apiKey }),
+        ...(merchantSecret && { 'X-SFPY-MERCHANT-SECRET': merchantSecret }),
       },
       body: JSON.stringify(payload),
     });
@@ -101,82 +95,99 @@ class SafePayGateway extends BasePaymentGateway {
     const tracker = result.data?.token || result.token || result.tracker;
 
     if (!tracker) {
-      throw new AppError('Safepay did not return a tracker token in response', 502, 'PAYMENT_GATEWAY_ERROR');
+      throw new AppError(
+        'Safepay did not return a tracker token in response',
+        502,
+        'PAYMENT_GATEWAY_ERROR'
+      );
     }
-    // Construct the components checkout URL using SafePay's components base and include multiple param variants for compatibility
+
+    const targetCallback =
+      callbackUrl ||
+      this.config.callbackUrl ||
+      process.env.CLIENT_URL ||
+      'http://localhost:5173/donate';
+
     const componentBase = this._getComponentUrl();
     const queryParams = new URLSearchParams({
-      // canonical params SafePay components expects
-      token: tracker,
+      beacon: tracker,
       tracker: tracker,
-      orderId: orderId,
-      order_id: orderId,
       env: environment,
       source: 'custom',
+      order_id: orderId,
       passthrough: 'true',
+      redirect_url: targetCallback,
+      cancel_url: targetCallback,
     });
-
-    // Provide both camelCase and snake_case redirect/cancel params for compatibility with different SafePay versions
-    if (callbackUrl) {
-      queryParams.set('redirectUrl', callbackUrl);
-      queryParams.set('redirect_url', callbackUrl);
-      queryParams.set('cancelUrl', callbackUrl);
-      queryParams.set('cancel_url', callbackUrl);
-    }
 
     const redirectUrl = `${componentBase}?${queryParams.toString()}`;
 
-        const responsePayload = {
-        gatewayRef: tracker,
-        redirectUrl,
-        meta: {
-              provider: 'SAFE_PAY',
-              tracker,
-              orderId,
-              checkoutUrl: redirectUrl,
-              response: result,
-            },
-          };
-
-          // 📍 PASTE IT HERE
-          console.log('Generated Safepay Redirect URL:', responsePayload.redirectUrl);
-
-          return responsePayload;
+    return {
+      gatewayRef: tracker,
+      redirectUrl,
+      meta: {
+        provider: 'SAFE_PAY',
+        tracker,
+        orderId,
+        checkoutUrl: redirectUrl,
+        response: result,
+      },
+    };
   }
-  /**
-   * Verify a transaction using Safepay Reporter API
-   *
-   * @param {string} gatewayRef - The tracker token (e.g. track_...)
-   * @returns {Promise<{ status: 'COMPLETED'|'PENDING'|'FAILED', meta: object }>}
-   */
-  async verifyPayment(gatewayRef) {
+async verifyPayment(gatewayRef) {
     if (!gatewayRef) {
       return { status: 'PENDING', meta: { gatewayRef } };
     }
 
     const baseUrl = this._getBaseUrl();
-    const endpoint = `${baseUrl}/reporter/api/v1/payments/${encodeURIComponent(gatewayRef)}`;
+    const endpoint = `${baseUrl}/order/v1/tracker/${encodeURIComponent(gatewayRef)}`;
+    const merchantSecret = this._getMerchantSecret();
+    const authHeaders = {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      ...(merchantSecret && { 'X-SFPY-MERCHANT-SECRET': merchantSecret }),
+    };
 
     try {
-      const response = await fetch(endpoint, {
+      let response = await fetch(endpoint, {
         method: 'GET',
-        headers: {
-          Accept: 'application/json',
-          ...(this.config.apiKey && { 'X-SFPY-API-KEY': this.config.apiKey }),
-        },
+        headers: authHeaders,
       });
+
+      if (!response.ok) {
+        // Fallback check to reporter API
+        const reporterUrl = `${baseUrl}/reporter/api/v1/payments/${encodeURIComponent(gatewayRef)}`;
+        response = await fetch(reporterUrl, {
+          method: 'GET',
+          headers: authHeaders,
+        });
+      }
 
       if (!response.ok) {
         return { status: 'PENDING', meta: { gatewayRef, httpStatus: response.status } };
       }
 
       const result = await response.json();
-      const state = result.data?.state || result.state || result.status;
+      const data = result.data || result;
+      const state = (data.state || data.status || data.tracker?.state || '').toUpperCase();
+
+      // Safepay treats TRACKER_ENDED, PAID, COMPLETED, and SETTLED as completed transactions
+      const isSuccess =
+        state === 'TRACKER_ENDED' ||
+        state === 'PAID' ||
+        state === 'COMPLETED' ||
+        state === 'SETTLED' ||
+        state === 'PAYMENT.COMPLETED';
+
+      const isFailure =
+        state === 'FAILED' ||
+        state === 'CANCELLED' ||
+        state === 'TRACKER_FAILED';
 
       let status = 'PENDING';
-      if (state === 'TRACKER_ENDED' || state === 'PAID' || state === 'COMPLETED') {
+      if (isSuccess) {
         status = 'COMPLETED';
-      } else if (state === 'FAILED' || state === 'CANCELLED') {
+      } else if (isFailure) {
         status = 'FAILED';
       }
 
@@ -186,23 +197,26 @@ class SafePayGateway extends BasePaymentGateway {
       return { status: 'PENDING', meta: { gatewayRef, error: err.message } };
     }
   }
-
-  /**
-   * Validate webhook signature and parse event payload
-   *
-   * @param {object} body - Webhook JSON body
-   * @param {object} headers - HTTP request headers
-   * @returns {Promise<{ gatewayRef: string, orderId?: string, status: string, meta: object }>}
-   */
   async parseWebhook(body, headers = {}) {
-    // 1. Signature Verification (if webhook secret is configured)
     const webhookSecret = this.config.webhookSecret || this.config.secret;
-    const signature = headers['x-sfpy-signature'] || headers['X-SFPY-SIGNATURE'];
-    const timestamp = headers['x-sfpy-timestamp'] || headers['X-SFPY-TIMESTAMP'];
+    const signature =
+      headers['x-sfpy-signature'] || headers['X-SFPY-SIGNATURE'];
+    const timestamp =
+      headers['x-sfpy-timestamp'] || headers['X-SFPY-TIMESTAMP'];
+
+    if (webhookSecret && !signature) {
+      throw new AppError(
+        'SafePay webhook signature is required',
+        401,
+        'INVALID_WEBHOOK_SIGNATURE'
+      );
+    }
 
     if (webhookSecret && signature) {
       try {
-        const rawPayload = timestamp ? `${timestamp}.${JSON.stringify(body)}` : JSON.stringify(body);
+        const rawPayload = timestamp
+          ? `${timestamp}.${JSON.stringify(body)}`
+          : JSON.stringify(body);
         const computedSignature = crypto
           .createHmac('sha256', webhookSecret)
           .update(rawPayload)
@@ -212,19 +226,42 @@ class SafePayGateway extends BasePaymentGateway {
         const sigBuffer = Buffer.from(cleanSignature, 'utf8');
         const compBuffer = Buffer.from(computedSignature, 'utf8');
 
-        if (sigBuffer.length === compBuffer.length && !crypto.timingSafeEqual(sigBuffer, compBuffer)) {
-          console.warn('[SafePay] Webhook signature mismatch. Proceeding with caution.');
+        if (
+          sigBuffer.length !== compBuffer.length ||
+          !crypto.timingSafeEqual(sigBuffer, compBuffer)
+        ) {
+          throw new AppError(
+            'Invalid SafePay webhook signature',
+            401,
+            'INVALID_WEBHOOK_SIGNATURE'
+          );
         }
       } catch (cryptoErr) {
-        console.warn(`[SafePay] Webhook signature verification error: ${cryptoErr.message}`);
+        if (cryptoErr instanceof AppError) throw cryptoErr;
+        throw new AppError(
+          'Invalid SafePay webhook signature',
+          401,
+          'INVALID_WEBHOOK_SIGNATURE'
+        );
       }
     }
 
-    // 2. Extract transaction identifiers
     const data = body.data || body;
-    const tracker = data.tracker || data.token || data.reference || body.tracker || body.reference;
-    const orderId = data.order_id || data.orderId || body.order_id || body.orderId;
-    const state = (data.state || data.status || body.status || body.event || '').toUpperCase();
+    const tracker =
+      data.tracker ||
+      data.token ||
+      data.reference ||
+      body.tracker ||
+      body.reference;
+    const orderId =
+      data.order_id || data.orderId || body.order_id || body.orderId;
+    const state = (
+      data.state ||
+      data.status ||
+      body.status ||
+      body.event ||
+      ''
+    ).toUpperCase();
 
     const isSuccess =
       state === 'TRACKER_ENDED' ||
@@ -250,7 +287,7 @@ class SafePayGateway extends BasePaymentGateway {
       gatewayRef: tracker || orderId,
       orderId: orderId,
       status,
- meta: body,
+      meta: body,
     };
   }
 }

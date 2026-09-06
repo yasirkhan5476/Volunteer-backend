@@ -1,0 +1,74 @@
+{
+  "clientName": "Thunder Client",
+  "collectionName": "Volunteer Platform - SafePay Testing",
+  "collectionId": "b1e9c20a-8d14-4321-9e12-safepay00001",
+  "dateExported": "2026-09-05",
+  "version": "1.1",
+  "folders": [],
+  "requests": [
+    {
+      "_id": "req-initiate-safepay",
+      "colId": "b1e9c20a-8d14-4321-9e12-safepay00001",
+      "containerId": "",
+      "name": "1. Initiate SafePay Donation",
+      "url": "http://localhost:3000/api/v1/donations",
+      "method": "POST",
+      "sortNum": 10000,
+      "created": "2026-09-05T00:50:00.000Z",
+      "modified": "2026-09-05T00:50:00.000Z",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "auth": {
+        "type": "bearer",
+        "bearer": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhNTlkMjE2YS1hNzRhLTQ3NjktYjAzYS05NzRmZTIyYTc0MmIiLCJyb2xlIjoiVk9MVU5URUVSIiwiaWF0IjoxNzg4NTUxOTIwLCJleHAiOjE3ODkxNTY3MjB9.x80IbB4N6KjOfiC5T7VfJ3E5vVRo2ALyvVdH0EZc2VQ"
+      },
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"eventId\": \"e4fa1020-aa59-4d8d-b048-4a049e690e44\",\n  \"amount\": 250,\n  \"currency\": \"PKR\",\n  \"gateway\": \"SAFE_PAY\"\n}",
+        "form": []
+      }
+    },
+    {
+      "_id": "req-get-my-donations",
+      "colId": "b1e9c20a-8d14-4321-9e12-safepay00001",
+      "containerId": "",
+      "name": "2. Get My Donations",
+      "url": "http://localhost:3000/api/v1/donations/my",
+      "method": "GET",
+      "sortNum": 20000,
+      "created": "2026-09-05T00:50:00.000Z",
+      "modified": "2026-09-05T00:50:00.000Z",
+      "headers": [],
+      "auth": {
+        "type": "bearer",
+        "bearer": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhNTlkMjE2YS1hNzRhLTQ3NjktYjAzYS05NzRmZTIyYTc0MmIiLCJyb2xlIjoiVk9MVU5URUVSIiwiaWF0IjoxNzg4NTUxOTIwLCJleHAiOjE3ODkxNTY3MjB9.x80IbB4N6KjOfiC5T7VfJ3E5vVRo2ALyvVdH0EZc2VQ"
+      }
+    },
+    {
+      "_id": "req-safepay-webhook-test",
+      "colId": "b1e9c20a-8d14-4321-9e12-safepay00001",
+      "containerId": "",
+      "name": "3. Simulate SafePay Webhook (Success)",
+      "url": "http://localhost:3000/api/v1/webhooks/safepay",
+      "method": "POST",
+      "sortNum": 30000,
+      "created": "2026-09-05T00:50:00.000Z",
+      "modified": "2026-09-05T00:50:00.000Z",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"event\": \"payment.completed\",\n  \"data\": {\n    \"tracker\": \"track_7ce1f4e7-802b-4525-b52b-faca4e3f6214\",\n    \"state\": \"PAID\",\n    \"amount\": 250,\n    \"currency\": \"PKR\"\n  }\n}",
+        "form": []
+      }
+    }
+  ]
+}

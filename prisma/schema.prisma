@@ -1,0 +1,226 @@
+// This is your Prisma schema file.
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────
+
+enum Role {
+  VOLUNTEER
+  ORGANIZER_PENDING
+  ORGANIZER
+  SUPER_ADMIN
+  // Legacy values retained so existing records and donation flows remain valid.
+  ADMIN
+  DONOR
+}
+
+enum AttendanceStatus {
+  CHECKED_IN
+  CHECKED_OUT
+  AUTO_CLOSED
+}
+
+enum DonationStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentGateway {
+  SAFE_PAY
+  JAZZCASH
+  EASYPAISA
+}
+
+enum PassportStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+// ─── Models ──────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  phone        String?
+  role         Role     @default(VOLUNTEER)
+  isVerified   Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  volunteerProfile VolunteerProfile?
+  organizations    Organization[]      @relation("OrgOwner")
+  memberships      OrgMembership[]
+  attendances      Attendance[]
+  donations        Donation[]
+  passports        Passport[]
+  createdEvents    Event[]             @relation("EventCreator")
+  auditLogs        AuditLog[]          @relation("AuditActor")
+
+  @@index([email])
+  @@map("users")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String
+  action    String
+  target    String
+  timestamp DateTime @default(now())
+
+  actor User @relation("AuditActor", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([actorId])
+  @@index([timestamp])
+  @@map("audit_logs")
+}
+
+model VolunteerProfile {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  bio         String?
+  skills      String[]
+  avatarUrl   String?
+  totalHours  Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("volunteer_profiles")
+}
+
+model Organization {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  logoUrl     String?
+  ownerId     String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner       User            @relation("OrgOwner", fields: [ownerId], references: [id])
+  events      Event[]
+  memberships OrgMembership[]
+
+  @@map("organizations")
+}
+
+model OrgMembership {
+  id             String   @id @default(uuid())
+  userId         String
+  organizationId String
+  joinedAt       DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@map("org_memberships")
+}
+
+model Event {
+  id             String   @id @default(uuid())
+  title          String
+  description    String?
+  organizationId String
+  createdById    String
+  latitude       Float
+  longitude      Float
+  radiusMeters   Float    @default(200)
+  address        String?
+  startTime      DateTime
+  endTime        DateTime
+  maxVolunteers  Int?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  createdBy    User         @relation("EventCreator", fields: [createdById], references: [id])
+  attendances  Attendance[]
+  donations    Donation[]
+
+  @@index([startTime])
+  @@map("events")
+}
+
+model Attendance {
+  id          String           @id @default(uuid())
+  userId      String
+  eventId     String
+  checkInLat  Float
+  checkInLng  Float
+  checkOutLat Float?
+  checkOutLng Float?
+  checkInTime DateTime         @default(now())
+  checkOutTime DateTime?
+  hoursLogged Float?
+  status      AttendanceStatus @default(CHECKED_IN)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId, checkInTime])
+  @@index([eventId])
+  @@index([userId])
+  @@map("attendances")
+}
+
+model Donation {
+  id          String         @id @default(uuid())
+  userId      String
+  eventId     String
+  amount      Float
+  currency    String         @default("PKR")
+  status      DonationStatus @default(PENDING)
+  gateway     PaymentGateway
+  gatewayRef  String?
+  gatewayMeta Json?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id])
+  event Event @relation(fields: [eventId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@map("donations")
+}
+
+model Passport {
+  id         String         @id @default(uuid())
+  userId     String
+  pdfUrl     String?
+  signature  String
+  publicKey  String
+  status     PassportStatus @default(ACTIVE)
+  issuedAt   DateTime       @default(now())
+  expiresAt  DateTime
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("passports")
+}

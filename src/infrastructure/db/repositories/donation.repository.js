@@ -17,6 +17,14 @@ class DonationRepository extends BaseRepository {
     return this.db.donation.findFirst({ where: { gatewayRef } });
   }
 
+  async findByIdOrGatewayRef(reference) {
+    return this.db.donation.findFirst({
+      where: {
+        OR: [{ id: reference }, { gatewayRef: reference }],
+      },
+    });
+  }
+
   async findAll(filters = {}) {
     const { userId, status, page = 1, limit = 20 } = filters;
     return this.db.donation.findMany({

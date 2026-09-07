@@ -19,9 +19,9 @@ class ProcessWebhookUseCase {
    * @param {object} headers - Webhook headers (for signature verification)
    * @returns {Promise<{ success: boolean, donationId: string, status: string }>}
    */
-  async execute(gatewayName, body, headers) {
+  async execute(gatewayName, body, headers, parsedBody) {
     const gateway = this.paymentGatewayFactory.get(gatewayName.toUpperCase());
-    const parsed = await gateway.parseWebhook(body, headers);
+    const parsed = await gateway.parseWebhook(body, headers, parsedBody);
 
     // Find donation by gateway reference (tracker) or orderId / id
     let donation = parsed.gatewayRef ? await this.donationRepository.findByGatewayRef(parsed.gatewayRef) : null;

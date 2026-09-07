@@ -17,7 +17,12 @@ const processWebhookUseCase = new ProcessWebhookUseCase({
  */
 router.post('/safepay', async (req, res, next) => {
   try {
-    const result = await processWebhookUseCase.execute('SAFE_PAY', req.body, req.headers);
+    const result = await processWebhookUseCase.execute(
+      'SAFE_PAY',
+      req.rawBody || req.body,
+      req.headers,
+      req.body
+    );
     res.status(200).json({ success: true, data: result });
   } catch (err) {
     next(err);

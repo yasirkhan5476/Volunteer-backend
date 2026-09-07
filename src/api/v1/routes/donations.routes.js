@@ -54,7 +54,7 @@ router.get('/my', authenticate, async (req, res, next) => {
 });
 
 /**
- * GET /donations/:id/status - Verify a pending donation with its gateway
+ * GET /donations/:id/status - Verify by donation UUID or SafePay tracker
  */
 router.get('/:id/status', authenticate, async (req, res, next) => {
   try {

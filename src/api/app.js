@@ -70,7 +70,12 @@ app.use(
 
 // ─── Body Parsing / Compression ──────────────────────────────
 app.use(compression());
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({
+  limit: '2mb',
+  verify: (req, _res, buffer) => {
+    req.rawBody = buffer;
+  },
+}));
 app.use(express.urlencoded({ extended: true }));
 
 // ─── Logging ─────────────────────────────────────────────────

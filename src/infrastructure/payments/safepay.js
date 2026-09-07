@@ -217,7 +217,7 @@ async verifyPayment(gatewayRef) {
       return { status: 'PENDING', meta: { gatewayRef, error: err.message } };
     }
   }
-async parseWebhook(body, headers = {}) {
+  async parseWebhook(body, headers = {}, parsedBody) {
     const webhookSecret = this.config.webhookSecret || this.config.secret;
     const signature = headers['x-sfpy-signature'] || headers['X-SFPY-SIGNATURE'];
     const timestamp = headers['x-sfpy-timestamp'] || headers['X-SFPY-TIMESTAMP'];
@@ -233,7 +233,11 @@ async parseWebhook(body, headers = {}) {
     if (webhookSecret && signature) {
       try {
         // Ensure rawBody is passed from Express/FastAPI (or fallback to stringified body)
-        const payloadString = typeof body === 'string' ? body : JSON.stringify(body);
+        const payloadString = Buffer.isBuffer(body)
+          ? body.toString('utf8')
+          : typeof body === 'string'
+            ? body
+            : JSON.stringify(body);
         const rawPayload = timestamp ? `${timestamp}.${payloadString}` : payloadString;
 
         const computedSignature = crypto
@@ -267,7 +271,13 @@ async parseWebhook(body, headers = {}) {
 
     let parsedBody;
     try {
-      parsedBody = typeof body === 'string' ? JSON.parse(body) : body;
+      parsedBody = parsedBody || (
+        Buffer.isBuffer(body)
+          ? JSON.parse(body.toString('utf8'))
+          : typeof body === 'string'
+            ? JSON.parse(body)
+            : body
+      );
     } catch {
       throw new AppError('Invalid SafePay webhook JSON', 400, 'INVALID_WEBHOOK_PAYLOAD');
     }
@@ -288,6 +298,13 @@ async parseWebhook(body, headers = {}) {
 
     const orderId =
       data.order_id || data.orderId || parsedBody.order_id || parsedBody.orderId;
+
+    const metadata = Array.isArray(parsedBody.payment_metadata)
+      ? parsedBody.payment_metadata
+      : Array.isArray(data.payment_metadata)
+        ? data.payment_metadata
+        : [];
+    const metadataOrderId = metadata.find((item) => item?.meta_key === 'order_id')?.meta_value;
 
     const state = this._getPaymentState(parsedBody);
 
@@ -312,8 +329,8 @@ async parseWebhook(body, headers = {}) {
     }
 
     return {
-      gatewayRef: tracker || orderId,
-      orderId: orderId,
+      gatewayRef: tracker || orderId || metadataOrderId,
+      orderId: orderId || metadataOrderId,
       status,
       meta: parsedBody,
     };

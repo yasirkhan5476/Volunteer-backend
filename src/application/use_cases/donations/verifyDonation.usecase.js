@@ -10,7 +10,7 @@ class VerifyDonationUseCase {
   }
 
   async execute(user, donationId) {
-    const donation = await this.donationRepository.findById(donationId);
+    const donation = await this.donationRepository.findByIdOrGatewayRef(donationId);
     if (!donation) throw new NotFoundError('Donation');
     if (donation.userId !== user.id && user.role !== 'SUPER_ADMIN' && user.role !== 'ADMIN') {
       throw new ForbiddenError();

@@ -44,7 +44,7 @@ class ProcessWebhookUseCase {
       REFUNDED: 'REFUNDED',
     };
 
-    const newStatus = statusMap[parsed.status.toUpperCase()] || 'FAILED';
+    const newStatus = statusMap[parsed.status.toUpperCase()] || 'PENDING';
 
     await this.donationRepository.update(donation.id, {
       status: newStatus,

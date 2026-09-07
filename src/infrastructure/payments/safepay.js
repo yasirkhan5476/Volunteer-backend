@@ -47,6 +47,26 @@ class SafePayGateway extends BasePaymentGateway {
     return 'https://getsafepay.com/checkout/pay';
   }
 
+  _getPaymentState(payload) {
+    const candidates = [
+      payload?.state,
+      payload?.status,
+      payload?.event,
+      payload?.transaction?.state,
+      payload?.transaction?.status,
+      payload?.payment?.state,
+      payload?.payment?.status,
+      payload?.data?.state,
+      payload?.data?.status,
+      payload?.data?.transaction?.state,
+      payload?.data?.transaction?.status,
+      payload?.data?.payment?.state,
+      payload?.data?.payment?.status,
+    ];
+
+    return candidates.find((value) => typeof value === 'string')?.toUpperCase() || '';
+  }
+
   async initiatePayment({
     amount,
     currency = 'PKR',
@@ -169,7 +189,7 @@ async verifyPayment(gatewayRef) {
 
       const result = await response.json();
       const data = result.data || result;
-      const state = (data.state || data.status || data.tracker?.state || '').toUpperCase();
+      const state = this._getPaymentState(result) || (data.tracker?.state || '').toUpperCase();
 
       // Safepay treats TRACKER_ENDED, PAID, COMPLETED, and SETTLED as completed transactions
       const isSuccess =
@@ -255,13 +275,7 @@ async verifyPayment(gatewayRef) {
       body.reference;
     const orderId =
       data.order_id || data.orderId || body.order_id || body.orderId;
-    const state = (
-      data.state ||
-      data.status ||
-      body.status ||
-      body.event ||
-      ''
-    ).toUpperCase();
+    const state = this._getPaymentState(body);
 
     const isSuccess =
       state === 'TRACKER_ENDED' ||

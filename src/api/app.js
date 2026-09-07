@@ -27,11 +27,27 @@ app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
 
 // ─── Security ────────────────────────────────────────────────
 app.use(helmet());
+const allowedOrigins = [
+  ...(process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+  process.env.FRONTEND_URL?.trim(),
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: config.isDev ? '*' : process.env.ALLOWED_ORIGINS?.split(',') || [],
+    origin: config.isDev
+      ? '*'
+      : (requestOrigin, callback) => {
+          if (!requestOrigin || allowedOrigins.includes(requestOrigin)) {
+            return callback(null, true);
+          }
+          return callback(new Error('Origin is not allowed by CORS'));
+        },
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
+    optionsSuccessStatus: 204,
   })
 );
 

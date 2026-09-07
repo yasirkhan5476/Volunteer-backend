@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon src/api/server.js",
     "start": "node src/api/server.js",
+    "vercel-build": "prisma generate",
     "lint": "eslint src/ --ext .js",
     "lint:fix": "eslint src/ --ext .js --fix",
     "format": "prettier --write \"src/**/*.js\"",

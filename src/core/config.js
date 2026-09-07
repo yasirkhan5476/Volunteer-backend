@@ -89,7 +89,7 @@ const config = {
 
   rateLimit: {
     windowMs: parseInt(optional('RATE_LIMIT_WINDOW_MS', '900000'), 10),
-    max: parseInt(optional('RATE_LIMIT_MAX', '100'), 10),
+    max: parseInt(optional('RATE_LIMIT_MAX', '1000'), 10),
   },
 
   passport: {

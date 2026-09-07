@@ -60,7 +60,8 @@ app.use(
 app.use(
   rateLimit({
     windowMs: config.rateLimit.windowMs,
-    max: config.rateLimit.max,
+    max: config.isProd ? Math.max(config.rateLimit.max, 1000) : config.rateLimit.max,
+    skip: (req) => req.method === 'OPTIONS' || req.path === `${config.apiPrefix}/health`,
     standardHeaders: true,
     legacyHeaders: false,
     message: { success: false, code: 'RATE_LIMIT_EXCEEDED', message: 'Too many requests' },

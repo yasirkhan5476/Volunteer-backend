@@ -22,14 +22,13 @@ const adminRoutes = require('./v1/routes/admin');
 
 const app = express();
 
-// ─── Essential Vercel Proxy Setup ────────────────────────────
-// Prevents express-rate-limit from throwing 500 crashes on Vercel
+// ─── Trust Proxy for Vercel ──────────────────────────────────
 app.set('trust proxy', 1);
 
 // ─── Serve Local Static Uploads ──────────────────────────────
 app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
 
-// ─── CORS & Security Configuration ───────────────────────────
+// ─── Security & CORS ─────────────────────────────────────────
 const allowedOrigins = [
   ...(process.env.ALLOWED_ORIGINS || '')
     .split(',')
@@ -38,10 +37,12 @@ const allowedOrigins = [
   process.env.FRONTEND_URL?.trim(),
 ].filter(Boolean);
 
-const isAllowedOrigin = (requestOrigin) =>
-  !requestOrigin ||
-  allowedOrigins.includes(requestOrigin) ||
-  /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(requestOrigin);
+const isAllowedOrigin = (requestOrigin) => {
+  if (!requestOrigin) return true;
+  if (allowedOrigins.includes(requestOrigin)) return true;
+  // Allow all Vercel frontend deployments dynamically
+  return /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(requestOrigin);
+};
 
 const corsOptions = {
   origin: config.isDev
@@ -63,7 +64,7 @@ const corsOptions = {
   optionsSuccessStatus: 204,
 };
 
-// Enable CORS and explicit preflight handling first
+// Mount CORS first to guarantee headers on all requests and preflights
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
@@ -77,9 +78,7 @@ app.use(
 app.use(
   rateLimit({
     windowMs: config.rateLimit.windowMs,
-    max: config.isProd
-      ? Math.max(config.rateLimit.max, 1000)
-      : config.rateLimit.max,
+    max: config.isProd ? Math.max(config.rateLimit.max, 1000) : config.rateLimit.max,
     skip: (req) =>
       req.method === 'OPTIONS' ||
       req.path === `${config.apiPrefix}/health`,
@@ -93,7 +92,7 @@ app.use(
   })
 );
 
-// ─── Body Parsing / Raw Body Capture ─────────────────────────
+// ─── Body Parsing & Raw Body Capture for Webhooks ───────────
 app.use(compression());
 app.use(
   express.json({
@@ -145,7 +144,7 @@ app.use((_req, res) => {
   });
 });
 
-// ─── Global Error Handler (Must remain last) ─────────────────
+// ─── Global Error Handler ────────────────────────────────────
 app.use(errorHandler);
 
 module.exports = app;

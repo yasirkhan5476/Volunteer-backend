@@ -217,12 +217,10 @@ async verifyPayment(gatewayRef) {
       return { status: 'PENDING', meta: { gatewayRef, error: err.message } };
     }
   }
-  async parseWebhook(body, headers = {}) {
+async parseWebhook(body, headers = {}) {
     const webhookSecret = this.config.webhookSecret || this.config.secret;
-    const signature =
-      headers['x-sfpy-signature'] || headers['X-SFPY-SIGNATURE'];
-    const timestamp =
-      headers['x-sfpy-timestamp'] || headers['X-SFPY-TIMESTAMP'];
+    const signature = headers['x-sfpy-signature'] || headers['X-SFPY-SIGNATURE'];
+    const timestamp = headers['x-sfpy-timestamp'] || headers['X-SFPY-TIMESTAMP'];
 
     if (webhookSecret && !signature) {
       throw new AppError(
@@ -234,9 +232,10 @@ async verifyPayment(gatewayRef) {
 
     if (webhookSecret && signature) {
       try {
-        const rawPayload = timestamp
-          ? `${timestamp}.${JSON.stringify(body)}`
-          : JSON.stringify(body);
+        // Ensure rawBody is passed from Express/FastAPI (or fallback to stringified body)
+        const payloadString = typeof body === 'string' ? body : JSON.stringify(body);
+        const rawPayload = timestamp ? `${timestamp}.${payloadString}` : payloadString;
+
         const computedSignature = crypto
           .createHmac('sha256', webhookSecret)
           .update(rawPayload)
@@ -266,16 +265,31 @@ async verifyPayment(gatewayRef) {
       }
     }
 
-    const data = body.data || body;
+    let parsedBody;
+    try {
+      parsedBody = typeof body === 'string' ? JSON.parse(body) : body;
+    } catch {
+      throw new AppError('Invalid SafePay webhook JSON', 400, 'INVALID_WEBHOOK_PAYLOAD');
+    }
+
+    if (!parsedBody || typeof parsedBody !== 'object') {
+      throw new AppError('Invalid SafePay webhook payload', 400, 'INVALID_WEBHOOK_PAYLOAD');
+    }
+
+    const data = parsedBody.data || parsedBody;
+    
+    // Safepay webhook payloads usually structure tracking tokens under data.token or data.tracker
     const tracker =
-      data.tracker ||
       data.token ||
+      data.tracker ||
       data.reference ||
-      body.tracker ||
-      body.reference;
+      parsedBody.token ||
+      parsedBody.tracker;
+
     const orderId =
-      data.order_id || data.orderId || body.order_id || body.orderId;
-    const state = this._getPaymentState(body);
+      data.order_id || data.orderId || parsedBody.order_id || parsedBody.orderId;
+
+    const state = this._getPaymentState(parsedBody);
 
     const isSuccess =
       state === 'TRACKER_ENDED' ||
@@ -301,7 +315,7 @@ async verifyPayment(gatewayRef) {
       gatewayRef: tracker || orderId,
       orderId: orderId,
       status,
-      meta: body,
+      meta: parsedBody,
     };
   }
 }

@@ -6,6 +6,8 @@ const cors = require('cors');
 const morgan = require('morgan');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
+const path = require('node:path');
+
 const config = require('../core/config');
 const { errorHandler } = require('./v1/middlewares/errorHandler');
 
@@ -18,15 +20,16 @@ const webhookRoutes = require('./v1/routes/webhooks.routes');
 const passportRoutes = require('./v1/routes/passport.routes');
 const adminRoutes = require('./v1/routes/admin');
 
-const path = require('node:path');
 const app = express();
+
+// ─── Essential Vercel Proxy Setup ────────────────────────────
+// Prevents express-rate-limit from throwing 500 crashes on Vercel
+app.set('trust proxy', 1);
 
 // ─── Serve Local Static Uploads ──────────────────────────────
 app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
 
-
-// ─── Security ────────────────────────────────────────────────
-app.use(helmet());
+// ─── CORS & Security Configuration ───────────────────────────
 const allowedOrigins = [
   ...(process.env.ALLOWED_ORIGINS || '')
     .split(',')
@@ -40,19 +43,33 @@ const isAllowedOrigin = (requestOrigin) =>
   allowedOrigins.includes(requestOrigin) ||
   /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(requestOrigin);
 
+const corsOptions = {
+  origin: config.isDev
+    ? true
+    : (requestOrigin, callback) => {
+        if (isAllowedOrigin(requestOrigin)) {
+          return callback(null, true);
+        }
+        return callback(new Error('Origin is not allowed by CORS'));
+      },
+  methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'x-sfpy-signature',
+    'x-sfpy-timestamp',
+  ],
+  credentials: true,
+  optionsSuccessStatus: 204,
+};
+
+// Enable CORS and explicit preflight handling first
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
 app.use(
-  cors({
-    origin: config.isDev
-      ? '*'
-      : (requestOrigin, callback) => {
-          if (isAllowedOrigin(requestOrigin)) {
-            return callback(null, true);
-          }
-          return callback(new Error('Origin is not allowed by CORS'));
-        },
-    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    optionsSuccessStatus: 204,
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
   })
 );
 
@@ -60,23 +77,35 @@ app.use(
 app.use(
   rateLimit({
     windowMs: config.rateLimit.windowMs,
-    max: config.isProd ? Math.max(config.rateLimit.max, 1000) : config.rateLimit.max,
-    skip: (req) => req.method === 'OPTIONS' || req.path === `${config.apiPrefix}/health`,
+    max: config.isProd
+      ? Math.max(config.rateLimit.max, 1000)
+      : config.rateLimit.max,
+    skip: (req) =>
+      req.method === 'OPTIONS' ||
+      req.path === `${config.apiPrefix}/health`,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { success: false, code: 'RATE_LIMIT_EXCEEDED', message: 'Too many requests' },
+    message: {
+      success: false,
+      code: 'RATE_LIMIT_EXCEEDED',
+      message: 'Too many requests, please try again later.',
+    },
   })
 );
 
-// ─── Body Parsing / Compression ──────────────────────────────
+// ─── Body Parsing / Raw Body Capture ─────────────────────────
 app.use(compression());
-app.use(express.json({
-  limit: '2mb',
-  verify: (req, _res, buffer) => {
-    req.rawBody = buffer;
-  },
-}));
-app.use(express.urlencoded({ extended: true }));
+app.use(
+  express.json({
+    limit: '2mb',
+    verify: (req, _res, buffer) => {
+      if (buffer && buffer.length) {
+        req.rawBody = buffer.toString('utf8');
+      }
+    },
+  })
+);
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
 // ─── Logging ─────────────────────────────────────────────────
 app.use(morgan(config.isDev ? 'dev' : 'combined'));
@@ -116,7 +145,7 @@ app.use((_req, res) => {
   });
 });
 
-// ─── Global Error Handler (must be last) ─────────────────────
+// ─── Global Error Handler (Must remain last) ─────────────────
 app.use(errorHandler);
 
 module.exports = app;

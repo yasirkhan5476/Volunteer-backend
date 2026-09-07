@@ -35,12 +35,17 @@ const allowedOrigins = [
   process.env.FRONTEND_URL?.trim(),
 ].filter(Boolean);
 
+const isAllowedOrigin = (requestOrigin) =>
+  !requestOrigin ||
+  allowedOrigins.includes(requestOrigin) ||
+  /^https:\/\/volunteer-frontend(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(requestOrigin);
+
 app.use(
   cors({
     origin: config.isDev
       ? '*'
       : (requestOrigin, callback) => {
-          if (!requestOrigin || allowedOrigins.includes(requestOrigin)) {
+          if (isAllowedOrigin(requestOrigin)) {
             return callback(null, true);
           }
           return callback(new Error('Origin is not allowed by CORS'));

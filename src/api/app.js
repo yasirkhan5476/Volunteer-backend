@@ -38,7 +38,7 @@ const allowedOrigins = [
 const isAllowedOrigin = (requestOrigin) =>
   !requestOrigin ||
   allowedOrigins.includes(requestOrigin) ||
-  /^https:\/\/volunteer-frontend(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(requestOrigin);
+  /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(requestOrigin);
 
 app.use(
   cors({

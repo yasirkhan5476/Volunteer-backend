@@ -11,6 +11,7 @@ const initiateDonationSchema = z.object({
       currency: z.enum(['PKR', 'ZAR']).default('PKR'),
       gateway: z.literal('SAFE_PAY'),
       callbackUrl: z.string().url().optional(),
+      cancelUrl: z.string().url().optional(),
       customerMobile: z.string().optional(),
       customerEmail: z.string().email().optional(),
       bankCode: z.string().min(1).optional(),

@@ -74,6 +74,7 @@ class SafePayGateway extends BasePaymentGateway {
     orderId,
     description,
     callbackUrl,
+    cancelUrl,
     webhookUrl,
   }) {
     const clientKey = this._getClientKey();
@@ -135,7 +136,7 @@ class SafePayGateway extends BasePaymentGateway {
       source: 'custom',
       webhooks: 'true',
       success_url: targetCallback,
-      cancel_url: targetCallback,
+      cancel_url: cancelUrl || targetCallback,
     };
 
     const componentBase = this._getComponentUrl();

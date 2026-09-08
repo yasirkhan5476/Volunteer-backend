@@ -12,10 +12,7 @@ const processWebhookUseCase = new ProcessWebhookUseCase({
   paymentGatewayFactory,
 });
 
-/**
- * POST /webhooks/safepay
- */
-router.post('/safepay', async (req, res) => {
+async function processSafepayWebhook(req, res, endpoint) {
   try {
     const result = await processWebhookUseCase.execute(
       'SAFE_PAY',
@@ -24,18 +21,35 @@ router.post('/safepay', async (req, res) => {
       req.body
     );
 
+    console.info(`[Safepay ${endpoint} webhook]`, result);
+
     return res.status(200).json({
       success: true,
       data: result,
     });
   } catch (err) {
-    console.error('[Safepay Webhook Error]:', err);
+    console.error(`[Safepay ${endpoint} webhook error]:`, err);
 
     return res.status(200).json({
       success: false,
       message: err.message,
     });
   }
-});
+}
+
+// v1 receives PAYMENT:CREATED and acknowledges the pending checkout session.
+router.post('/safepay/v1', (req, res) =>
+  processSafepayWebhook(req, res, 'v1')
+);
+
+// v2 receives PAYMENT.SUCCEEDED/PAYMENT.FAILED and updates the donation.
+router.post('/safepay/v2', (req, res) =>
+  processSafepayWebhook(req, res, 'v2')
+);
+
+// Legacy endpoint retained for existing Safepay dashboard configurations.
+router.post('/safepay', (req, res) =>
+  processSafepayWebhook(req, res, 'legacy')
+);
 
 module.exports = router;

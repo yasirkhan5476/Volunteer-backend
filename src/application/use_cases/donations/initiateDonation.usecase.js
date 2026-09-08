@@ -38,7 +38,8 @@ class InitiateDonationUseCase {
     // 3. Initiate payment via selected gateway
     const gateway = this.paymentGatewayFactory.get(dto.gateway);
     const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
-    const defaultCallbackUrl = `${frontendUrl}/donate?order_id=${encodeURIComponent(donation.id)}`;
+    const defaultSuccessUrl = `${frontendUrl}/donate/success?order_id=${encodeURIComponent(donation.id)}`;
+    const defaultCancelUrl = `${frontendUrl}/donate?status=cancelled`;
     const defaultWebhookUrl =
       process.env.SAFE_PAY_WEBHOOK_URL ||
       `${(process.env.BACKEND_URL || 'http://localhost:3000').replace(/\/$/, '')}${process.env.API_PREFIX || '/api/v1'}/webhooks/safepay`;
@@ -50,7 +51,8 @@ class InitiateDonationUseCase {
         currency: dto.currency || 'PKR',
         orderId: donation.id,
         description: `Donation to: ${event.title}`,
-        callbackUrl: dto.callbackUrl || defaultCallbackUrl,
+        callbackUrl: dto.callbackUrl || defaultSuccessUrl,
+        cancelUrl: dto.cancelUrl || defaultCancelUrl,
         customerMobile: dto.customerMobile,
         customerEmail: dto.customerEmail,
         bankCode: dto.bankCode,

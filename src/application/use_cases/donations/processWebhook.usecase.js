@@ -23,6 +23,11 @@ class ProcessWebhookUseCase {
     const gateway = this.paymentGatewayFactory.get(gatewayName.toUpperCase());
     const parsed = await gateway.parseWebhook(body, headers, parsedBody);
 
+    // payment:created only opens the checkout session; it is not a payment result.
+    if (parsed.eventType === 'payment:created') {
+      return { success: true, status: 'IGNORED_INITIATION_EVENT' };
+    }
+
     // Find donation by gateway reference (tracker) or orderId / id
     let donation = parsed.gatewayRef ? await this.donationRepository.findByGatewayRef(parsed.gatewayRef) : null;
     if (!donation && parsed.orderId) {
@@ -44,7 +49,11 @@ class ProcessWebhookUseCase {
       REFUNDED: 'REFUNDED',
     };
 
-    const newStatus = statusMap[parsed.status.toUpperCase()] || 'PENDING';
+    const newStatus = statusMap[parsed.status.toUpperCase()];
+
+    if (!newStatus) {
+      return { success: true, donationId: donation.id, status: 'PENDING' };
+    }
 
     await this.donationRepository.update(donation.id, {
       status: newStatus,

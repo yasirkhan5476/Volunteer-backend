@@ -131,6 +131,32 @@ describe('SafePayGateway', () => {
       expect(result.status).toBe('COMPLETED');
     });
 
+    test('acknowledges payment:created as PENDING', async () => {
+      const webhookBody = {
+        event: 'payment:created',
+        data: {
+          tracker: 'track_tracker_created',
+          order_id: 'order-created-123',
+          intent: 'PENDING',
+        },
+      };
+      const timestamp = String(Date.now());
+      const rawPayload = `${timestamp}.${JSON.stringify(webhookBody)}`;
+      const signature = crypto
+        .createHmac('sha256', mockConfig.webhookSecret)
+        .update(rawPayload)
+        .digest('hex');
+
+      const result = await gateway.parseWebhook(webhookBody, {
+        'x-sfpy-signature': signature,
+        'x-sfpy-timestamp': timestamp,
+      });
+
+      expect(result.eventType).toBe('payment:created');
+      expect(result.gatewayRef).toBe('track_tracker_created');
+      expect(result.status).toBe('PENDING');
+    });
+
     test('correctly parses failed payment as FAILED', async () => {
       const webhookBody = {
         event: 'payment.failed',

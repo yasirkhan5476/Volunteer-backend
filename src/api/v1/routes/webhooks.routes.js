@@ -15,7 +15,7 @@ const processWebhookUseCase = new ProcessWebhookUseCase({
 /**
  * POST /webhooks/safepay
  */
-router.post('/safepay', async (req, res, next) => {
+router.post('/safepay', async (req, res) => {
   try {
     const result = await processWebhookUseCase.execute(
       'SAFE_PAY',
@@ -23,9 +23,22 @@ router.post('/safepay', async (req, res, next) => {
       req.headers,
       req.body
     );
-    res.status(200).json({ success: true, data: result });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Webhook processed successfully',
+      data: result,
+    });
   } catch (err) {
-    next(err);
+    // Log the error for internal debugging
+    console.error('⚠️ [Safepay Webhook Warning]:', err.message);
+
+    // Always respond with HTTP 200 so Safepay registers successful delivery
+    return res.status(200).json({
+      success: false,
+      message: 'Webhook received but processing bypassed',
+      error: err.message,
+    });
   }
 });
 

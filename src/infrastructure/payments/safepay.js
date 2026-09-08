@@ -52,6 +52,7 @@ class SafePayGateway extends BasePaymentGateway {
       payload?.state,
       payload?.status,
       payload?.event,
+      payload?.type,
       payload?.transaction?.state,
       payload?.transaction?.status,
       payload?.payment?.state,
@@ -192,18 +193,20 @@ class SafePayGateway extends BasePaymentGateway {
       const data = result.data || result;
       const state = this._getPaymentState(result) || (data.tracker?.state || '').toUpperCase();
 
-      // Safepay treats TRACKER_ENDED, PAID, COMPLETED, and SETTLED as completed transactions
       const isSuccess =
+        state === 'CYBERSOURCE' ||
         state === 'TRACKER_ENDED' ||
         state === 'PAID' ||
         state === 'COMPLETED' ||
         state === 'SETTLED' ||
-        state === 'PAYMENT.COMPLETED';
+        state === 'PAYMENT.COMPLETED' ||
+        state === 'PAYMENT.SUCCEEDED';
 
       const isFailure =
         state === 'FAILED' ||
         state === 'CANCELLED' ||
-        state === 'TRACKER_FAILED';
+        state === 'TRACKER_FAILED' ||
+        state === 'PAYMENT.FAILED';
 
       let status = 'PENDING';
       if (isSuccess) {
@@ -306,9 +309,23 @@ class SafePayGateway extends BasePaymentGateway {
         : [];
     const metadataOrderId = metadata.find((item) => item?.meta_key === 'order_id')?.meta_value;
 
-    const state = this._getPaymentState(parsedPayload);
+    // Detect event types across v1 (payment:created) and v2 (payment.succeeded)
+    const eventType = (
+      parsedPayload.event ||
+      parsedPayload.type ||
+      ''
+    ).toLowerCase();
+
+    const state = (
+      data.intent ||
+      parsedPayload.intent ||
+      this._getPaymentState(parsedPayload) ||
+      ''
+    ).toUpperCase();
 
     const isSuccess =
+      eventType === 'payment.succeeded' ||
+      state === 'CYBERSOURCE' ||
       state === 'TRACKER_ENDED' ||
       state === 'PAID' ||
       state === 'COMPLETED' ||
@@ -316,13 +333,17 @@ class SafePayGateway extends BasePaymentGateway {
       state === 'ORDER.COMPLETED';
 
     const isFailure =
+      eventType === 'payment.failed' ||
       state === 'FAILED' ||
       state === 'CANCELLED' ||
       state === 'PAYMENT.FAILED' ||
       state === 'TRACKER_FAILED';
 
     let status = 'PENDING';
-    if (isSuccess) {
+    if (eventType === 'payment:created') {
+      // Checkout creation is acknowledged but is not a completed payment.
+      status = 'PENDING';
+    } else if (isSuccess) {
       status = 'COMPLETED';
     } else if (isFailure) {
       status = 'FAILED';
@@ -332,6 +353,7 @@ class SafePayGateway extends BasePaymentGateway {
       gatewayRef: tracker || orderId || metadataOrderId,
       orderId: orderId || metadataOrderId,
       status,
+      eventType,
       meta: parsedPayload,
     };
   }

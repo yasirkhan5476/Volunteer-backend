@@ -38,7 +38,7 @@ class InitiateDonationUseCase {
     // 3. Initiate payment via selected gateway
     const gateway = this.paymentGatewayFactory.get(dto.gateway);
     const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
-    const defaultCallbackUrl = `${frontendUrl}/donations/success?donationId=${donation.id}`;
+    const defaultCallbackUrl = `${frontendUrl}/donate?order_id=${encodeURIComponent(donation.id)}`;
     const defaultWebhookUrl =
       process.env.SAFE_PAY_WEBHOOK_URL ||
       `${(process.env.BACKEND_URL || 'http://localhost:3000').replace(/\/$/, '')}${process.env.API_PREFIX || '/api/v1'}/webhooks/safepay`;

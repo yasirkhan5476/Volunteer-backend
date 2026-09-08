@@ -129,16 +129,27 @@ class SafePayGateway extends BasePaymentGateway {
       process.env.CLIENT_URL ||
       'http://localhost:5173/donate';
 
+    const checkoutPayload = {
+      token: tracker,
+      order_id: orderId,
+      source: 'custom',
+      webhooks: 'true',
+      success_url: targetCallback,
+      cancel_url: targetCallback,
+    };
+
     const componentBase = this._getComponentUrl();
     const queryParams = new URLSearchParams({
-      beacon: tracker,
-      tracker: tracker,
+      beacon: checkoutPayload.token,
+      tracker: checkoutPayload.token,
       env: environment,
-      source: 'custom',
-      order_id: orderId,
+      source: checkoutPayload.source,
+      webhooks: checkoutPayload.webhooks,
+      success_url: checkoutPayload.success_url,
+      cancel_url: checkoutPayload.cancel_url,
+      order_id: checkoutPayload.order_id,
       passthrough: 'true',
-      redirect_url: targetCallback,
-      cancel_url: targetCallback,
+      redirect_url: checkoutPayload.success_url,
     });
 
     const redirectUrl = `${componentBase}?${queryParams.toString()}`;

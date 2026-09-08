@@ -154,7 +154,8 @@ class SafePayGateway extends BasePaymentGateway {
       },
     };
   }
-async verifyPayment(gatewayRef) {
+
+  async verifyPayment(gatewayRef) {
     if (!gatewayRef) {
       return { status: 'PENDING', meta: { gatewayRef } };
     }
@@ -217,7 +218,8 @@ async verifyPayment(gatewayRef) {
       return { status: 'PENDING', meta: { gatewayRef, error: err.message } };
     }
   }
-  async parseWebhook(body, headers = {}, parsedBody) {
+
+  async parseWebhook(body, headers = {}, initialParsedBody) {
     const webhookSecret = this.config.webhookSecret || this.config.secret;
     const signature = headers['x-sfpy-signature'] || headers['X-SFPY-SIGNATURE'];
     const timestamp = headers['x-sfpy-timestamp'] || headers['X-SFPY-TIMESTAMP'];
@@ -232,7 +234,6 @@ async verifyPayment(gatewayRef) {
 
     if (webhookSecret && signature) {
       try {
-        // Ensure rawBody is passed from Express/FastAPI (or fallback to stringified body)
         const payloadString = Buffer.isBuffer(body)
           ? body.toString('utf8')
           : typeof body === 'string'
@@ -269,9 +270,9 @@ async verifyPayment(gatewayRef) {
       }
     }
 
-    let parsedBody;
+    let parsedPayload;
     try {
-      parsedBody = parsedBody || (
+      parsedPayload = initialParsedBody || (
         Buffer.isBuffer(body)
           ? JSON.parse(body.toString('utf8'))
           : typeof body === 'string'
@@ -282,31 +283,30 @@ async verifyPayment(gatewayRef) {
       throw new AppError('Invalid SafePay webhook JSON', 400, 'INVALID_WEBHOOK_PAYLOAD');
     }
 
-    if (!parsedBody || typeof parsedBody !== 'object') {
+    if (!parsedPayload || typeof parsedPayload !== 'object') {
       throw new AppError('Invalid SafePay webhook payload', 400, 'INVALID_WEBHOOK_PAYLOAD');
     }
 
-    const data = parsedBody.data || parsedBody;
-    
-    // Safepay webhook payloads usually structure tracking tokens under data.token or data.tracker
+    const data = parsedPayload.data || parsedPayload;
+
     const tracker =
       data.token ||
       data.tracker ||
       data.reference ||
-      parsedBody.token ||
-      parsedBody.tracker;
+      parsedPayload.token ||
+      parsedPayload.tracker;
 
     const orderId =
-      data.order_id || data.orderId || parsedBody.order_id || parsedBody.orderId;
+      data.order_id || data.orderId || parsedPayload.order_id || parsedPayload.orderId;
 
-    const metadata = Array.isArray(parsedBody.payment_metadata)
-      ? parsedBody.payment_metadata
+    const metadata = Array.isArray(parsedPayload.payment_metadata)
+      ? parsedPayload.payment_metadata
       : Array.isArray(data.payment_metadata)
         ? data.payment_metadata
         : [];
     const metadataOrderId = metadata.find((item) => item?.meta_key === 'order_id')?.meta_value;
 
-    const state = this._getPaymentState(parsedBody);
+    const state = this._getPaymentState(parsedPayload);
 
     const isSuccess =
       state === 'TRACKER_ENDED' ||
@@ -332,7 +332,7 @@ async verifyPayment(gatewayRef) {
       gatewayRef: tracker || orderId || metadataOrderId,
       orderId: orderId || metadataOrderId,
       status,
-      meta: parsedBody,
+      meta: parsedPayload,
     };
   }
 }

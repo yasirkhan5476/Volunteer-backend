@@ -6,6 +6,19 @@ const config = require('./config');
 /** @type {PrismaClient} */
 let prisma;
 
+function getDatabaseUrl() {
+  const databaseUrl = new URL(config.db.url);
+
+  if (!databaseUrl.searchParams.has('connection_limit')) {
+    databaseUrl.searchParams.set('connection_limit', '5');
+  }
+  if (!databaseUrl.searchParams.has('pool_timeout')) {
+    databaseUrl.searchParams.set('pool_timeout', '20');
+  }
+
+  return databaseUrl.toString();
+}
+
 /**
  * Returns a singleton Prisma client instance.
  * Uses global to survive hot-reload in development.
@@ -13,6 +26,7 @@ let prisma;
 function getDatabase() {
   if (!prisma) {
     prisma = new PrismaClient({
+      datasources: { db: { url: getDatabaseUrl() } },
       log: config.isDev ? ['query', 'info', 'warn', 'error'] : ['error'],
       errorFormat: 'pretty',
     });

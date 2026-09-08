@@ -19,6 +19,10 @@ function optional(key, defaultValue = '') {
   return process.env[key] || defaultValue;
 }
 
+function normalizeDatabaseUrl(value) {
+  return value.trim().replace(/^"|"$/g, '');
+}
+
 const config = {
   env: optional('NODE_ENV', 'development'),
   port: parseInt(optional('PORT', '3000'), 10),
@@ -27,7 +31,7 @@ const config = {
   isProd: optional('NODE_ENV', 'development') === 'production',
 
   db: {
-    url: required('DATABASE_URL'),
+    url: normalizeDatabaseUrl(required('DATABASE_URL')),
   },
 
   redis: {

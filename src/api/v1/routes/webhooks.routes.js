@@ -26,18 +26,14 @@ router.post('/safepay', async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: 'Webhook processed successfully',
       data: result,
     });
   } catch (err) {
-    // Log the error for internal debugging
-    console.error('⚠️ [Safepay Webhook Warning]:', err.message);
+    console.error('[Safepay Webhook Error]:', err);
 
-    // Always respond with HTTP 200 so Safepay registers successful delivery
     return res.status(200).json({
       success: false,
-      message: 'Webhook received but processing bypassed',
-      error: err.message,
+      message: err.message,
     });
   }
 });

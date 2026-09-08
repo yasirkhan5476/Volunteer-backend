@@ -297,7 +297,8 @@ class SafePayGateway extends BasePaymentGateway {
       data.tracker ||
       data.reference ||
       parsedPayload.token ||
-      parsedPayload.tracker;
+      parsedPayload.tracker ||
+      parsedPayload.gatewayRef;
 
     const orderId =
       data.order_id || data.orderId || parsedPayload.order_id || parsedPayload.orderId;
@@ -309,45 +310,50 @@ class SafePayGateway extends BasePaymentGateway {
         : [];
     const metadataOrderId = metadata.find((item) => item?.meta_key === 'order_id')?.meta_value;
 
-    // Detect event types across v1 (payment:created) and v2 (payment.succeeded)
-    const eventType = (
-      parsedPayload.event ||
-      parsedPayload.type ||
-      ''
-    ).toLowerCase();
-
+    const rawEvent = [
+      parsedPayload.event,
+      parsedPayload.type,
+      parsedPayload.intent,
+      data.event,
+      data.type,
+      data.intent,
+    ].find((value) => typeof value === 'string');
+    const event = (rawEvent || '').toLowerCase();
     const state = (
-      data.intent ||
+      data.state ||
+      data.status ||
+      parsedPayload.state ||
+      parsedPayload.status ||
       parsedPayload.intent ||
+      data.intent ||
       this._getPaymentState(parsedPayload) ||
       ''
     ).toUpperCase();
 
+    const isCreated = event === 'payment:created' || event === 'payment.created';
     const isSuccess =
-      eventType === 'payment.succeeded' ||
-      state === 'CYBERSOURCE' ||
-      state === 'TRACKER_ENDED' ||
-      state === 'PAID' ||
-      state === 'COMPLETED' ||
-      state === 'PAYMENT.COMPLETED' ||
-      state === 'ORDER.COMPLETED';
-
+      event === 'payment.succeeded' ||
+      event === 'payment:succeeded' ||
+      ['CYBERSOURCE', 'PAID', 'COMPLETED'].includes(state);
     const isFailure =
-      eventType === 'payment.failed' ||
-      state === 'FAILED' ||
-      state === 'CANCELLED' ||
-      state === 'PAYMENT.FAILED' ||
-      state === 'TRACKER_FAILED';
+      event === 'payment.failed' ||
+      event === 'payment:failed' ||
+      ['CANCELLED', 'FAILED'].includes(state);
 
-    let status = 'PENDING';
-    if (eventType === 'payment:created') {
-      // Checkout creation is acknowledged but is not a completed payment.
-      status = 'PENDING';
-    } else if (isSuccess) {
-      status = 'COMPLETED';
-    } else if (isFailure) {
-      status = 'FAILED';
-    }
+    const status = isCreated
+      ? 'PENDING'
+      : isSuccess
+        ? 'COMPLETED'
+        : isFailure
+          ? 'FAILED'
+          : 'PENDING';
+    const eventType = isCreated
+      ? 'payment:created'
+      : isSuccess
+        ? 'payment.succeeded'
+        : isFailure
+          ? 'payment.failed'
+          : event;
 
     return {
       gatewayRef: tracker || orderId || metadataOrderId,

@@ -17,50 +17,41 @@ class ProcessWebhookUseCase {
    * @param {string} gatewayName - 'SAFE_PAY'
    * @param {object} body - Raw webhook body
    * @param {object} headers - Webhook headers (for signature verification)
-   * @returns {Promise<{ success: boolean, donationId: string, status: string }>}
+  * @returns {Promise<{ status: string, donationId?: string }>}
    */
   async execute(gatewayName, body, headers, parsedBody) {
     const gateway = this.paymentGatewayFactory.get(gatewayName.toUpperCase());
     const parsed = await gateway.parseWebhook(body, headers, parsedBody);
 
     // payment:created only opens the checkout session; it is not a payment result.
-    if (parsed.eventType === 'payment:created') {
-      return { success: true, status: 'IGNORED_INITIATION_EVENT' };
+    if (parsed.status === 'PENDING') {
+      return { status: 'PENDING_ACKNOWLEDGED' };
     }
 
-    // Find donation by gateway reference (tracker) or orderId / id
-    let donation = parsed.gatewayRef ? await this.donationRepository.findByGatewayRef(parsed.gatewayRef) : null;
-    if (!donation && parsed.orderId) {
-      donation = await this.donationRepository.findById(parsed.orderId);
-    }
-    if (!donation && parsed.gatewayRef) {
-      donation = await this.donationRepository.findById(parsed.gatewayRef);
+    const reference = parsed.orderId || parsed.gatewayRef;
+    let donation = reference
+      ? await this.donationRepository.findByIdOrGatewayRef(reference)
+      : null;
+    if (!donation && parsed.orderId && parsed.gatewayRef) {
+      donation = await this.donationRepository.findByIdOrGatewayRef(parsed.gatewayRef);
     }
     if (!donation) throw new NotFoundError('Donation');
 
-    // Map gateway status to our internal status
-    const statusMap = {
-      COMPLETED: 'COMPLETED',
-      SUCCESS: 'COMPLETED',
-      PAID: 'COMPLETED',
-      TRACKER_ENDED: 'COMPLETED',
-      FAILED: 'FAILED',
-      CANCELLED: 'FAILED',
-      REFUNDED: 'REFUNDED',
-    };
+    if (parsed.status === 'COMPLETED') {
+      await this.donationRepository.update(donation.id, {
+        status: 'COMPLETED',
+        gatewayMeta: { ...(donation.gatewayMeta || {}), ...parsed.meta },
+      });
 
-    const newStatus = statusMap[parsed.status.toUpperCase()];
-
-    if (!newStatus) {
-      return { success: true, donationId: donation.id, status: 'PENDING' };
+      return { status: 'COMPLETED', donationId: donation.id };
     }
 
     await this.donationRepository.update(donation.id, {
-      status: newStatus,
+      status: 'FAILED',
       gatewayMeta: { ...(donation.gatewayMeta || {}), ...parsed.meta },
     });
 
-    return { success: true, donationId: donation.id, status: newStatus };
+    return { status: 'FAILED', donationId: donation.id };
   }
 }
 

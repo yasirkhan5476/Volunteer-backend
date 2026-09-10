@@ -15,6 +15,7 @@ if (process.env.VERCEL) {
   const { scheduleAutoCloseJob } = require('../infrastructure/workers/queue');
   require('../infrastructure/workers/email.worker');
   require('../infrastructure/workers/pdf.worker');
+  require('../infrastructure/workers/donationReceipt.worker');
   require('../infrastructure/workers/attendance.worker');
 
   async function start() {

@@ -29,6 +29,16 @@ const pdfQueue = new Queue('pdf', {
   },
 });
 
+const donationReceiptQueue = new Queue('donation-receipt', {
+  connection,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 5000 },
+    removeOnComplete: 100,
+    removeOnFail: 500,
+  },
+});
+
 /** Attendance auto-close scheduled queue */
 const attendanceQueue = new Queue('attendance', {
   connection,
@@ -52,4 +62,10 @@ async function scheduleAutoCloseJob() {
   console.info('✅  Scheduled attendance auto-close job (every 1 hour)');
 }
 
-module.exports = { emailQueue, pdfQueue, attendanceQueue, scheduleAutoCloseJob };
+module.exports = {
+  emailQueue,
+  pdfQueue,
+  donationReceiptQueue,
+  attendanceQueue,
+  scheduleAutoCloseJob,
+};

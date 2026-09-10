@@ -19,6 +19,7 @@ const donationRoutes = require('./v1/routes/donations.routes');
 const webhookRoutes = require('./v1/routes/webhooks.routes');
 const passportRoutes = require('./v1/routes/passport.routes');
 const adminRoutes = require('./v1/routes/admin');
+const userRoutes = require('./v1/routes/users.routes');
 
 const app = express();
 
@@ -54,12 +55,7 @@ const corsOptions = {
         return callback(new Error('Origin is not allowed by CORS'));
       },
   methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: [
-    'Content-Type',
-    'Authorization',
-    'x-sfpy-signature',
-    'x-sfpy-timestamp',
-  ],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-sfpy-signature', 'x-sfpy-timestamp'],
   credentials: true,
   optionsSuccessStatus: 204,
 };
@@ -79,9 +75,7 @@ app.use(
   rateLimit({
     windowMs: config.rateLimit.windowMs,
     max: config.isProd ? Math.max(config.rateLimit.max, 1000) : config.rateLimit.max,
-    skip: (req) =>
-      req.method === 'OPTIONS' ||
-      req.path === `${config.apiPrefix}/health`,
+    skip: (req) => req.method === 'OPTIONS' || req.path === `${config.apiPrefix}/health`,
     standardHeaders: true,
     legacyHeaders: false,
     message: {
@@ -94,12 +88,18 @@ app.use(
 
 // ─── Body Parsing & Raw Body Capture for Webhooks ───────────
 app.use(compression());
+// Safepay signs the exact JSON bytes. Capture them before express.json parses
+// or normalizes the payload.
+app.use(
+  `${config.apiPrefix}/webhooks/safepay`,
+  express.raw({ type: 'application/json', limit: '2mb' })
+);
 app.use(
   express.json({
     limit: '2mb',
     verify: (req, _res, buffer) => {
-      if (buffer && buffer.length) {
-        req.rawBody = buffer.toString('utf8');
+      if (buffer && buffer.length && !req.rawBody) {
+        req.rawBody = buffer;
       }
     },
   })
@@ -134,6 +134,7 @@ app.use(`${config.apiPrefix}/donations`, donationRoutes);
 app.use(`${config.apiPrefix}/webhooks`, webhookRoutes);
 app.use(`${config.apiPrefix}/passport`, passportRoutes);
 app.use(`${config.apiPrefix}/admin`, adminRoutes);
+app.use(`${config.apiPrefix}/users`, userRoutes);
 
 // ─── 404 Handler ─────────────────────────────────────────────
 app.use((_req, res) => {

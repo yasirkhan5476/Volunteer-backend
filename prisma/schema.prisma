@@ -195,6 +195,9 @@ model Donation {
   status      DonationStatus @default(PENDING)
   gateway     PaymentGateway
   gatewayRef  String?
+  orderId     String?        @unique
+  safepayPaymentId String?
+  safepayEventId   String?   @unique
   gatewayMeta Json?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt

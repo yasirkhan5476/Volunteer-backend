@@ -17,41 +17,60 @@ class ProcessWebhookUseCase {
    * @param {string} gatewayName - 'SAFE_PAY'
    * @param {object} body - Raw webhook body
    * @param {object} headers - Webhook headers (for signature verification)
-  * @returns {Promise<{ status: string, donationId?: string }>}
+   * @returns {Promise<{ status: string, donationId?: string }>}
    */
   async execute(gatewayName, body, headers, parsedBody) {
     const gateway = this.paymentGatewayFactory.get(gatewayName.toUpperCase());
-    const parsed = await gateway.parseWebhook(body, headers, parsedBody);
+    const parsed = parsedBody?.eventType ? parsedBody : await gateway.parseWebhook(body, headers);
+    const eventType = parsed.eventType;
 
-    // payment:created only opens the checkout session; it is not a payment result.
-    if (parsed.status === 'PENDING') {
-      return { status: 'PENDING_ACKNOWLEDGED' };
+    if (!eventType) return { status: 'IGNORED_UNHANDLED_EVENT' };
+    if (
+      parsed.eventId &&
+      this.donationRepository.findBySafepayEventId &&
+      (await this.donationRepository.findBySafepayEventId(parsed.eventId))
+    ) {
+      return { status: 'DUPLICATE_EVENT', eventId: parsed.eventId };
+    }
+
+    if (
+      eventType === 'refund:created' ||
+      eventType === 'error:occurred' ||
+      parsed.status === null
+    ) {
+      return { status: 'LOGGED_ONLY', eventType };
     }
 
     const reference = parsed.orderId || parsed.gatewayRef;
     let donation = reference
-      ? await this.donationRepository.findByIdOrGatewayRef(reference)
+      ? await this.donationRepository.findByOrderIdOrGatewayRef(reference)
       : null;
     if (!donation && parsed.orderId && parsed.gatewayRef) {
       donation = await this.donationRepository.findByIdOrGatewayRef(parsed.gatewayRef);
     }
     if (!donation) throw new NotFoundError('Donation');
 
-    if (parsed.status === 'COMPLETED') {
-      await this.donationRepository.update(donation.id, {
-        status: 'COMPLETED',
-        gatewayMeta: { ...(donation.gatewayMeta || {}), ...parsed.meta },
-      });
-
-      return { status: 'COMPLETED', donationId: donation.id };
-    }
-
-    await this.donationRepository.update(donation.id, {
-      status: 'FAILED',
+    const updated = await this.donationRepository.update(donation.id, {
+      status: parsed.status,
+      safepayEventId: parsed.eventId || undefined,
+      safepayPaymentId: parsed.paymentId || parsed.transactionId || undefined,
       gatewayMeta: { ...(donation.gatewayMeta || {}), ...parsed.meta },
     });
 
-    return { status: 'FAILED', donationId: donation.id };
+    if (updated.status === 'COMPLETED') {
+      try {
+        const { donationReceiptQueue } = require('../../../infrastructure/workers/queue');
+        void donationReceiptQueue
+          .add('generate-and-email', { donationId: donation.id })
+          .catch((error) => {
+            console.error('[Donation receipt queue error]:', error.message);
+          });
+      } catch (error) {
+        console.error('[Donation receipt queue error]:', error.message);
+      }
+    }
+
+    return { status: updated.status, donationId: donation.id, eventId: parsed.eventId };
   }
 }
 

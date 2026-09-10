@@ -25,6 +25,16 @@ class DonationRepository extends BaseRepository {
     });
   }
 
+  async findByOrderIdOrGatewayRef(reference) {
+    return this.db.donation.findFirst({
+      where: { OR: [{ id: reference }, { orderId: reference }, { gatewayRef: reference }] },
+    });
+  }
+
+  async findBySafepayEventId(eventId) {
+    return this.db.donation.findFirst({ where: { safepayEventId: eventId } });
+  }
+
   async findAll(filters = {}) {
     const { userId, status, page = 1, limit = 20 } = filters;
     return this.db.donation.findMany({

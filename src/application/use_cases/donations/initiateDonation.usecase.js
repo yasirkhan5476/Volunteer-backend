@@ -33,12 +33,13 @@ class InitiateDonationUseCase {
       currency: dto.currency || 'PKR',
       gateway: dto.gateway,
       status: 'PENDING',
+      orderId: null,
     });
 
     // 3. Initiate payment via selected gateway
     const gateway = this.paymentGatewayFactory.get(dto.gateway);
     const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
-    const defaultSuccessUrl = `${frontendUrl}/donate/success?order_id=${encodeURIComponent(donation.id)}`;
+    const defaultSuccessUrl = `${frontendUrl}/donate/callback?order_id=${encodeURIComponent(donation.id)}`;
     const defaultCancelUrl = `${frontendUrl}/donate?status=cancelled`;
     const defaultWebhookUrl =
       process.env.SAFE_PAY_WEBHOOK_URL ||
@@ -65,13 +66,17 @@ class InitiateDonationUseCase {
         webhookUrl: defaultWebhookUrl,
       });
     } catch (error) {
-      await this.donationRepository.update(donation.id, { status: 'FAILED', gatewayMeta: { error: error.message } });
+      await this.donationRepository.update(donation.id, {
+        status: 'FAILED',
+        gatewayMeta: { error: error.message },
+      });
       throw error;
     }
 
     // 4. Save gateway reference
     const updated = await this.donationRepository.update(donation.id, {
       gatewayRef: gatewayResult.gatewayRef,
+      orderId: donation.id,
       gatewayMeta: gatewayResult.meta,
     });
 

@@ -24,16 +24,12 @@ class SafePayGateway extends BasePaymentGateway {
   _isSandbox() {
     const base = (this.config.baseUrl || '').toLowerCase();
     return (
-      base.includes('sandbox') ||
-      base.includes('dev') ||
-      process.env.NODE_ENV !== 'production'
+      base.includes('sandbox') || base.includes('dev') || process.env.NODE_ENV !== 'production'
     );
   }
 
   _getBaseUrl() {
-    const raw = (
-      this.config.baseUrl || 'https://sandbox.api.getsafepay.com'
-    ).replace(/\/$/, '');
+    const raw = (this.config.baseUrl || 'https://sandbox.api.getsafepay.com').replace(/\/$/, '');
     if (raw.includes('dev.api.getsafepay.com')) {
       return 'https://sandbox.api.getsafepay.com';
     }
@@ -72,10 +68,10 @@ class SafePayGateway extends BasePaymentGateway {
     amount,
     currency = 'PKR',
     orderId,
-    description,
+    _description,
     callbackUrl,
     cancelUrl,
-    webhookUrl,
+    _webhookUrl,
   }) {
     const clientKey = this._getClientKey();
     if (!clientKey) {
@@ -87,10 +83,7 @@ class SafePayGateway extends BasePaymentGateway {
     }
 
     const baseUrl = this._getBaseUrl();
-    const checkoutPath = (this.config.checkoutPath || '/order/v1/init').replace(
-      /^\//,
-      ''
-    );
+    const checkoutPath = (this.config.checkoutPath || '/order/v1/init').replace(/^\//, '');
     const endpoint = `${baseUrl}/${checkoutPath}`;
     const environment = this._isSandbox() ? 'sandbox' : 'production';
     const merchantSecret = this._getMerchantSecret();
@@ -234,66 +227,51 @@ class SafePayGateway extends BasePaymentGateway {
     }
   }
 
-  async parseWebhook(body, headers = {}, initialParsedBody) {
+  async parseWebhook(body, headers = {}, _initialParsedBody) {
     const webhookSecret = this.config.webhookSecret || this.config.secret;
     const signature = headers['x-sfpy-signature'] || headers['X-SFPY-SIGNATURE'];
     const timestamp = headers['x-sfpy-timestamp'] || headers['X-SFPY-TIMESTAMP'];
 
-    if (webhookSecret && !signature) {
+    if (!webhookSecret || !signature || !timestamp) {
       throw new AppError(
-        'SafePay webhook signature is required',
+        'SafePay webhook signature and timestamp are required',
         401,
         'INVALID_WEBHOOK_SIGNATURE'
       );
     }
 
-    if (webhookSecret && signature) {
-      try {
-        const payloadString = Buffer.isBuffer(body)
-          ? body.toString('utf8')
-          : typeof body === 'string'
-            ? body
-            : JSON.stringify(body);
-        const rawPayload = timestamp ? `${timestamp}.${payloadString}` : payloadString;
+    const timestampNumber = Number(timestamp);
+    const timestampSeconds = timestampNumber > 1e12 ? timestampNumber / 1000 : timestampNumber;
+    if (
+      !Number.isFinite(timestampSeconds) ||
+      Math.abs(Date.now() / 1000 - timestampSeconds) > 300
+    ) {
+      throw new AppError('Stale SafePay webhook timestamp', 401, 'INVALID_WEBHOOK_SIGNATURE');
+    }
 
-        const computedSignature = crypto
-          .createHmac('sha256', webhookSecret)
-          .update(rawPayload)
-          .digest('hex');
-
-        const cleanSignature = signature.replace(/^sha256=/, '');
-        const sigBuffer = Buffer.from(cleanSignature, 'utf8');
-        const compBuffer = Buffer.from(computedSignature, 'utf8');
-
-        if (
-          sigBuffer.length !== compBuffer.length ||
-          !crypto.timingSafeEqual(sigBuffer, compBuffer)
-        ) {
-          throw new AppError(
-            'Invalid SafePay webhook signature',
-            401,
-            'INVALID_WEBHOOK_SIGNATURE'
-          );
-        }
-      } catch (cryptoErr) {
-        if (cryptoErr instanceof AppError) throw cryptoErr;
-        throw new AppError(
-          'Invalid SafePay webhook signature',
-          401,
-          'INVALID_WEBHOOK_SIGNATURE'
-        );
+    try {
+      const rawBody = Buffer.isBuffer(body) ? body : Buffer.from(String(body));
+      const key = Buffer.from(webhookSecret, 'base64');
+      const expected = `sha256=${crypto
+        .createHmac('sha256', key)
+        .update(`${timestamp}.${rawBody.toString('utf8')}`)
+        .digest('hex')}`;
+      const expectedBuffer = Buffer.from(expected);
+      const actualBuffer = Buffer.from(String(signature));
+      if (
+        expectedBuffer.length !== actualBuffer.length ||
+        !crypto.timingSafeEqual(expectedBuffer, actualBuffer)
+      ) {
+        throw new AppError('Invalid SafePay webhook signature', 401, 'INVALID_WEBHOOK_SIGNATURE');
       }
+    } catch (cryptoErr) {
+      if (cryptoErr instanceof AppError) throw cryptoErr;
+      throw new AppError('Invalid SafePay webhook signature', 401, 'INVALID_WEBHOOK_SIGNATURE');
     }
 
     let parsedPayload;
     try {
-      parsedPayload = initialParsedBody || (
-        Buffer.isBuffer(body)
-          ? JSON.parse(body.toString('utf8'))
-          : typeof body === 'string'
-            ? JSON.parse(body)
-            : body
-      );
+      parsedPayload = JSON.parse(Buffer.isBuffer(body) ? body.toString('utf8') : String(body));
     } catch {
       throw new AppError('Invalid SafePay webhook JSON', 400, 'INVALID_WEBHOOK_PAYLOAD');
     }
@@ -305,12 +283,11 @@ class SafePayGateway extends BasePaymentGateway {
     const data = parsedPayload.data || parsedPayload;
 
     const tracker =
-      data.token ||
-      data.tracker ||
-      data.reference ||
       parsedPayload.token ||
       parsedPayload.tracker ||
-      parsedPayload.gatewayRef;
+      data.token ||
+      data.tracker ||
+      parsedPayload.order_id;
 
     const orderId =
       data.order_id || data.orderId || parsedPayload.order_id || parsedPayload.orderId;
@@ -323,55 +300,44 @@ class SafePayGateway extends BasePaymentGateway {
     const metadataOrderId = metadata.find((item) => item?.meta_key === 'order_id')?.meta_value;
 
     const rawEvent = [
-      parsedPayload.event,
       parsedPayload.type,
-      parsedPayload.intent,
-      data.event,
+      parsedPayload.event,
       data.type,
-      data.intent,
+      data.event,
+      headers['x-sfpy-event-type'],
     ].find((value) => typeof value === 'string');
     const event = (rawEvent || '').toLowerCase();
-    const state = (
-      data.state ||
-      data.status ||
-      parsedPayload.state ||
-      parsedPayload.status ||
-      parsedPayload.intent ||
-      data.intent ||
-      this._getPaymentState(parsedPayload) ||
-      ''
-    ).toUpperCase();
+    console.info('[Safepay event.type]', rawEvent || '');
 
-    const isCreated = event === 'payment:created' || event === 'payment.created';
-    const isSuccess =
-      event === 'payment.succeeded' ||
-      event === 'payment:succeeded' ||
-      ['CYBERSOURCE', 'PAID', 'COMPLETED'].includes(state);
-    const isFailure =
-      event === 'payment.failed' ||
-      event === 'payment:failed' ||
-      ['CANCELLED', 'FAILED'].includes(state);
-
-    const status = isCreated
-      ? 'PENDING'
-      : isSuccess
-        ? 'COMPLETED'
-        : isFailure
-          ? 'FAILED'
-          : 'PENDING';
-    const eventType = isCreated
-      ? 'payment:created'
-      : isSuccess
-        ? 'payment.succeeded'
-        : isFailure
-          ? 'payment.failed'
-          : event;
+    const statusByEvent = {
+      'payment:created': 'PENDING',
+      'payment.created': 'PENDING',
+      'payment.succeeded': 'COMPLETED',
+      'payment:succeeded': 'COMPLETED',
+      'payment.failed': 'FAILED',
+      'payment:failed': 'FAILED',
+      'payment.refunded': 'REFUNDED',
+      'payment:refunded': 'REFUNDED',
+      'refund:created': null,
+      'refund.created': null,
+      'error:occurred': null,
+      'error.occurred': null,
+    };
+    const status = Object.prototype.hasOwnProperty.call(statusByEvent, event)
+      ? statusByEvent[event]
+      : null;
+    const eventId = headers['x-sfpy-event-id'] || headers['X-SFPY-EVENT-ID'] || parsedPayload.id;
+    const paymentId = data.payment_id || data.paymentId || data.id || parsedPayload.payment_id;
+    const transactionId = data.transaction_id || data.transactionId || data.settlement_id;
 
     return {
       gatewayRef: tracker || orderId || metadataOrderId,
       orderId: orderId || metadataOrderId,
+      eventId,
+      paymentId,
+      transactionId,
       status,
-      eventType,
+      eventType: event,
       meta: parsedPayload,
     };
   }

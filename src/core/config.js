@@ -53,6 +53,10 @@ const config = {
     frontendUrl: optional('FRONTEND_URL', 'http://localhost:5173'),
   },
 
+  blob: {
+    readWriteToken: optional('BLOB_READ_WRITE_TOKEN'),
+  },
+
   bcrypt: {
     saltRounds: parseInt(optional('BCRYPT_SALT_ROUNDS', '12'), 10),
   },
@@ -76,13 +80,28 @@ const config = {
 
   payments: {
     safePay: {
-      publicKey: optional('SAFE_PAY_PUBLIC_KEY') || optional('SAFEPAY_PUBLIC_KEY') || optional('SAFE_PAY_CLIENT') || optional('SAFEPAY_CLIENT'),
+      publicKey:
+        optional('SAFE_PAY_PUBLIC_KEY') ||
+        optional('SAFEPAY_PUBLIC_KEY') ||
+        optional('SAFE_PAY_CLIENT') ||
+        optional('SAFEPAY_CLIENT'),
       apiKey: optional('SAFE_PAY_API_KEY') || optional('SAFEPAY_API_KEY'),
       merchantSecret: optional('SAFE_PAY_MERCHANT_SECRET') || optional('SAFEPAY_MERCHANT_SECRET'),
-      secret: optional('SAFE_PAY_SECRET') || optional('SAFEPAY_SECRET') || optional('SAFE_PAY_API_KEY') || optional('SAFEPAY_API_KEY'),
-      baseUrl: optional('SAFE_PAY_BASE_URL') || optional('SAFEPAY_BASE_URL', 'https://sandbox.api.getsafepay.com'),
+      secret:
+        optional('SAFE_PAY_SECRET') ||
+        optional('SAFEPAY_SECRET') ||
+        optional('SAFE_PAY_API_KEY') ||
+        optional('SAFEPAY_API_KEY'),
+      baseUrl:
+        optional('SAFE_PAY_BASE_URL') ||
+        optional('SAFEPAY_BASE_URL', 'https://sandbox.api.getsafepay.com'),
       checkoutPath: optional('SAFE_PAY_CHECKOUT_PATH', '/order/v1/init'),
-      webhookSecret: optional('SAFE_PAY_WEBHOOK_SECRET') || optional('SAFEPAY_WEBHOOK_SECRET') || optional('SAFE_PAY_SECRET') || optional('SAFEPAY_SECRET'),
+      webhookSecret:
+        optional('SAFE_PAY_WEBHOOK_SECRET') ||
+        optional('SAFEPAY_WEBHOOK_SECRET') ||
+        optional('SAFE_PAY_SECRET') ||
+        optional('SAFEPAY_SECRET'),
+      webhookId: optional('SAFE_PAY_WEBHOOK_ID') || optional('SAFEPAY_WEBHOOK_ID'),
       webhookUrl: optional('SAFE_PAY_WEBHOOK_URL') || optional('SAFEPAY_WEBHOOK_URL'),
     },
   },

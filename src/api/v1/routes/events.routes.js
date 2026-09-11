@@ -20,7 +20,16 @@ const userRepository = new UserRepository();
 router.get('/', validate(listEventsSchema), async (req, res, next) => {
   try {
     const result = await eventRepository.findAll(req.query);
-    res.status(200).json({ success: true, data: result });
+    res.status(200).json({
+      success: true,
+      data: result.data,
+      pagination: {
+        totalItems: result.total,
+        currentPage: result.page,
+        totalPages: Math.ceil(result.total / result.limit),
+        limit: result.limit,
+      },
+    });
   } catch (err) {
     next(err);
   }

@@ -26,21 +26,22 @@ async function processSafepayWebhook(req, res) {
     return res.status(status).json({ success: false, message: err.message });
   }
 
-  res.status(200).json({ status: 'success' });
-
-  setImmediate(async () => {
-    try {
-      const result = await processWebhookUseCase.execute(
-        'SAFE_PAY',
-        req.rawBody || req.body,
-        req.headers,
-        verifiedEvent
-      );
-      console.info('[Safepay webhook processed]', result);
-    } catch (err) {
-      console.error('[Safepay webhook error]:', err);
-    }
-  });
+  try {
+    const result = await processWebhookUseCase.execute(
+      'SAFE_PAY',
+      req.rawBody || req.body,
+      req.headers,
+      verifiedEvent
+    );
+    console.info('[Safepay webhook processed]', result);
+    return res.status(200).json({ status: 'success', result });
+  } catch (err) {
+    console.error('[Safepay webhook error]:', err);
+    return res.status(err.statusCode || err.status || 500).json({
+      success: false,
+      message: err.message,
+    });
+  }
 }
 
 // One endpoint receives both v1 colon and v2 dot events.

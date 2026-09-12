@@ -55,7 +55,11 @@ router.post('/profile-image', authenticate, handleProfileImageUpload, async (req
     }
 
     if (!config.blob.readWriteToken) {
-      return res.status(500).json({ error: 'Profile image storage is not configured.' });
+      return res.status(500).json({
+        success: false,
+        code: 'PROFILE_IMAGE_STORAGE_NOT_CONFIGURED',
+        error: 'Profile image storage is not configured on the deployed backend.',
+      });
     }
 
     const profile = await userRepository.findByIdWithProfile(req.user.id);

@@ -61,15 +61,20 @@ class IssuePassportUseCase {
       expiresAt,
     });
 
-    // Queue PDF generation
-    await pdfQueue.add('generate-passport-pdf', {
-      passportId: passport.id,
-      userId: targetUserId,
-      fullName: `${user.firstName} ${user.lastName}`,
-      totalHours: profile.totalHours,
-      issuedAt,
-      expiresAt: expiresAt.toISOString(),
-    });
+    // PDF generation is follow-up work and must not turn a committed passport
+    // into a failed request when Redis/BullMQ is unavailable on Vercel.
+    try {
+      await pdfQueue.add('generate-passport-pdf', {
+        passportId: passport.id,
+        userId: targetUserId,
+        fullName: `${user.firstName} ${user.lastName}`,
+        totalHours: profile.totalHours,
+        issuedAt,
+        expiresAt: expiresAt.toISOString(),
+      });
+    } catch (error) {
+      console.error('[Passport] PDF was not queued:', error.message);
+    }
 
     return new PassportEntity(passport);
   }

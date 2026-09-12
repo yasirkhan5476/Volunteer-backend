@@ -19,7 +19,7 @@ class LoginUseCase {
    * @returns {Promise<{ user: UserEntity, accessToken: string, refreshToken: string }>}
    */
   async execute(dto) {
-    const record = await this.userRepository.findByEmail(dto.email.toLowerCase());
+    const record = await this.userRepository.findByEmail(dto.email.trim().toLowerCase());
 
     if (!record) {
       throw new UnauthorizedError('Invalid email or password');

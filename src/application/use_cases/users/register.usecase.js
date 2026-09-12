@@ -46,13 +46,19 @@ class RegisterUseCase {
       await this.userRepository.createVolunteerProfile(user.id);
     }
 
-    await emailQueue.add('send-welcome-email', {
-      to: user.email,
-      template: 'welcome',
-      data: {
-        firstName: user.firstName,
-      },
-    });
+    // Account creation must not be reported as failed when the optional
+    // welcome-email queue is unavailable. The user row is already committed.
+    try {
+      await emailQueue.add('send-welcome-email', {
+        to: user.email,
+        template: 'welcome',
+        data: {
+          firstName: user.firstName,
+        },
+      });
+    } catch (error) {
+      console.warn('[Register] Welcome email was not queued:', error.message);
+    }
 
     return new UserEntity(user);
   }

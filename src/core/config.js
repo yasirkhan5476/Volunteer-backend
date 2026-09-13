@@ -118,6 +118,8 @@ const config = {
   passport: {
     privateKeyPath: optional('PASSPORT_PRIVATE_KEY_PATH', './keys/passport_private.pem'),
     publicKeyPath: optional('PASSPORT_PUBLIC_KEY_PATH', './keys/passport_public.pem'),
+    privateKey: optional('PASSPORT_PRIVATE_KEY').replace(/\\n/g, '\n'),
+    publicKey: optional('PASSPORT_PUBLIC_KEY').replace(/\\n/g, '\n'),
   },
 };
 

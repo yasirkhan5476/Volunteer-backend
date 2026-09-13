@@ -4,6 +4,7 @@ const crypto = require('node:crypto');
 const { BasePaymentGateway } = require('../../domain/interfaces/payment');
 const { AppError } = require('../../core/exceptions');
 
+
 /**
  * Safepay Payment Gateway Adapter
  * Official Documentation: https://getsafepay.com

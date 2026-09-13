@@ -21,16 +21,22 @@ let _publicKey = null;
 
 function loadPrivateKey() {
   if (!_privateKey) {
-    const keyPath = path.resolve(config.passport.privateKeyPath);
-    _privateKey = fs.readFileSync(keyPath, 'utf8');
+    _privateKey = config.passport.privateKey;
+    if (!_privateKey) {
+      const keyPath = path.resolve(config.passport.privateKeyPath);
+      _privateKey = fs.readFileSync(keyPath, 'utf8');
+    }
   }
   return _privateKey;
 }
 
 function loadPublicKey() {
   if (!_publicKey) {
-    const keyPath = path.resolve(config.passport.publicKeyPath);
-    _publicKey = fs.readFileSync(keyPath, 'utf8');
+    _publicKey = config.passport.publicKey;
+    if (!_publicKey) {
+      const keyPath = path.resolve(config.passport.publicKeyPath);
+      _publicKey = fs.readFileSync(keyPath, 'utf8');
+    }
   }
   return _publicKey;
 }

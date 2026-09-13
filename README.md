@@ -102,6 +102,12 @@ publish events or initiate donations until a `SUPER_ADMIN` approves them from
 `/admin/approvals`. Apply the RBAC migration with `npx prisma migrate deploy`
 and regenerate the client with `npx prisma generate`.
 
+For Vercel, configure `PASSPORT_PRIVATE_KEY` and `PASSPORT_PUBLIC_KEY` with the
+complete PEM contents from the generated files, replacing line breaks with
+literal `\n` characters if the dashboard does not preserve multiline values.
+Use the same key pair for every deployment so previously issued passports remain
+verifiable.
+
 Attendance records that are still `CHECKED_IN` when an event's `endTime` passes
 are automatically changed to `AUTO_CLOSED` every minute. Their hours are
 calculated from check-in time to the event end time and added to the volunteer

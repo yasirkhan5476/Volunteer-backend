@@ -23,6 +23,17 @@ function normalizeDatabaseUrl(value) {
   return value.trim().replace(/^"|"$/g, '');
 }
 
+function normalizePem(value) {
+  const normalized = optional(value).trim().replace(/^"|"$/g, '').replace(/\\n/g, '\n');
+  if (!normalized) return '';
+  if (normalized.includes('-----BEGIN')) return normalized;
+  try {
+    return Buffer.from(normalized, 'base64').toString('utf8');
+  } catch {
+    return normalized;
+  }
+}
+
 const config = {
   env: optional('NODE_ENV', 'development'),
   port: parseInt(optional('PORT', '3000'), 10),
@@ -118,8 +129,8 @@ const config = {
   passport: {
     privateKeyPath: optional('PASSPORT_PRIVATE_KEY_PATH', './keys/passport_private.pem'),
     publicKeyPath: optional('PASSPORT_PUBLIC_KEY_PATH', './keys/passport_public.pem'),
-    privateKey: optional('PASSPORT_PRIVATE_KEY').replace(/\\n/g, '\n'),
-    publicKey: optional('PASSPORT_PUBLIC_KEY').replace(/\\n/g, '\n'),
+    privateKey: normalizePem('PASSPORT_PRIVATE_KEY'),
+    publicKey: normalizePem('PASSPORT_PUBLIC_KEY'),
   },
 };
 

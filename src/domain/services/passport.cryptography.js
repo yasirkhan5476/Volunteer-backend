@@ -4,7 +4,6 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const config = require('../../core/config');
-const { AppError } = require('../../core/exceptions');
 
 /**
  * Passport Cryptography Service
@@ -20,6 +19,13 @@ const { AppError } = require('../../core/exceptions');
 let _privateKey = null;
 let _publicKey = null;
 
+function generateEphemeralKeyPair() {
+  const pair = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  _privateKey = pair.privateKey.export({ type: 'pkcs8', format: 'pem' });
+  _publicKey = pair.publicKey.export({ type: 'spki', format: 'pem' });
+  console.warn('[Passport] No configured key pair found; using an in-memory signing key for this server instance.');
+}
+
 function loadPrivateKey() {
   if (!_privateKey) {
     _privateKey = config.passport.privateKey;
@@ -28,11 +34,7 @@ function loadPrivateKey() {
         const keyPath = path.resolve(config.passport.privateKeyPath);
         _privateKey = fs.readFileSync(keyPath, 'utf8');
       } catch {
-        throw new AppError(
-          'Passport signing is not configured. Set PASSPORT_PRIVATE_KEY and PASSPORT_PUBLIC_KEY in the backend deployment.',
-          503,
-          'PASSPORT_CONFIGURATION_ERROR',
-        );
+        generateEphemeralKeyPair();
       }
     }
   }
@@ -47,11 +49,7 @@ function loadPublicKey() {
         const keyPath = path.resolve(config.passport.publicKeyPath);
         _publicKey = fs.readFileSync(keyPath, 'utf8');
       } catch {
-        throw new AppError(
-          'Passport verification is not configured. Set PASSPORT_PRIVATE_KEY and PASSPORT_PUBLIC_KEY in the backend deployment.',
-          503,
-          'PASSPORT_CONFIGURATION_ERROR',
-        );
+        generateEphemeralKeyPair();
       }
     }
   }

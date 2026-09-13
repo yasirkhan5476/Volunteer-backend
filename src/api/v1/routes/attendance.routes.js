@@ -11,6 +11,7 @@ const { AttendanceRepository } = require('../../../infrastructure/db/repositorie
 const { EventRepository } = require('../../../infrastructure/db/repositories/event.repository');
 const { UserRepository } = require('../../../infrastructure/db/repositories/user.repository');
 const { rejectPendingOrganizer } = require('../middlewares/auth');
+const { AutoCloseAttendanceJob } = require('../../../application/use_cases/attendance/autoClose.job');
 
 const router = Router();
 
@@ -20,6 +21,15 @@ const eventRepository = new EventRepository();
 const userRepository = new UserRepository();
 const checkInUseCase = new CheckInUseCase({ eventRepository, attendanceRepository });
 const checkOutUseCase = new CheckOutUseCase({ attendanceRepository, userRepository });
+const autoCloseAttendanceJob = new AutoCloseAttendanceJob({ attendanceRepository, userRepository });
+
+async function closeExpiredAttendance() {
+  try {
+    await autoCloseAttendanceJob.execute();
+  } catch (error) {
+    console.error('[AutoClose] Request-time fallback failed:', error.message);
+  }
+}
 
 /**
  * POST /attendance/check-in
@@ -50,6 +60,7 @@ router.post('/check-out', authenticate, rejectPendingOrganizer, validate(checkOu
  */
 router.get('/my', authenticate, async (req, res, next) => {
   try {
+    await closeExpiredAttendance();
     const { page = 1, limit = 20 } = req.query;
     const records = await attendanceRepository.findAll({
       userId: req.user.id,
@@ -67,6 +78,7 @@ router.get('/my', authenticate, async (req, res, next) => {
  */
 router.get('/all', authenticate, authorize('ORGANIZER', 'SUPER_ADMIN', 'ADMIN'), async (req, res, next) => {
   try {
+    await closeExpiredAttendance();
     const { page = 1, limit = 50, eventId } = req.query;
     const db = attendanceRepository.db;
 

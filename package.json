@@ -16,6 +16,7 @@
     "migrate:deploy": "npx prisma migrate deploy",
     "generate": "npx prisma generate",
     "seed": "node prisma/seed.js",
+    "repair-attendance-hours": "node scripts/repairAttendanceHours.js",
     "create-admin": "node scripts/createAdmin.js",
     "studio": "npx prisma studio"
   },

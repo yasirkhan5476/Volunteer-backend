@@ -32,14 +32,16 @@ class AutoCloseAttendanceJob {
             ((checkOutTime - new Date(record.checkInTime)) / 1000 / 3600) * 100
           ) / 100;
 
-        await this.attendanceRepository.update(record.id, {
+        const result = await this.attendanceRepository.closeIfCheckedIn(record.id, {
           checkOutTime,
           hoursLogged: Math.max(0, hoursLogged),
           status: 'AUTO_CLOSED',
         });
 
-        await this.userRepository.incrementTotalHours(record.userId, Math.max(0, hoursLogged));
-        closed++;
+        if (result.count === 1) {
+          await this.userRepository.incrementTotalHours(record.userId, Math.max(0, hoursLogged));
+          closed++;
+        }
       } catch (err) {
         console.error(`[AutoClose] Failed to close attendance ${record.id}:`, err.message);
       }

@@ -69,6 +69,13 @@ class AttendanceRepository extends BaseRepository {
     return this.db.attendance.update({ where: { id }, data });
   }
 
+  async closeIfCheckedIn(id, data) {
+    return this.db.attendance.updateMany({
+      where: { id, status: 'CHECKED_IN' },
+      data,
+    });
+  }
+
   async delete(id) {
     return this.db.attendance.delete({ where: { id } });
   }

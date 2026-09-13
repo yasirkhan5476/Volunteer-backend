@@ -35,10 +35,17 @@ class CheckOutUseCase {
       throw new UnprocessableError('You are not currently checked in');
     }
 
-    // 4. Calculate hours
-    const checkOutTime = new Date();
+    // 4. Cap manual checkout at the event end so delayed checkout cannot inflate hours.
+    const requestedCheckOutTime = new Date();
+    const eventEndTime = record.event?.endTime ? new Date(record.event.endTime) : null;
+    const checkOutTime = eventEndTime && eventEndTime < requestedCheckOutTime
+      ? eventEndTime
+      : requestedCheckOutTime;
     const hoursLogged =
-      Math.round(((checkOutTime - new Date(record.checkInTime)) / 1000 / 3600) * 100) / 100;
+      Math.max(
+        0,
+        Math.round(((checkOutTime - new Date(record.checkInTime)) / 1000 / 3600) * 100) / 100,
+      );
 
     // 5. Update attendance
     const updated = await this.attendanceRepository.update(dto.attendanceId, {
